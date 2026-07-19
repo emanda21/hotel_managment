@@ -7,6 +7,10 @@
  * via sessionStorage — no separate Supabase auth flow is needed here.
  */
 
+// Opt out of static prerendering — useSearchParams() requires a runtime
+// request context and cannot be called during Next.js static generation.
+export const dynamic = 'force-dynamic'
+
 import { useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
