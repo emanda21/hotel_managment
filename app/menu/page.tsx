@@ -49,7 +49,7 @@ type TableModalProps = {
   orderErrorMsg: string
   cart: CartItem[]
   total: number
-  removeFromCart: (itemId: number) => void
+  removeFromCart: (itemId: string) => void
   addToCart: (item: MenuItem) => void
 }
 
