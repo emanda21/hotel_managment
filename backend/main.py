@@ -75,13 +75,13 @@ app = FastAPI(
 )
 
 # ---------------------------------------------------------------------------
-# CORS — allow the Next.js front-end to call this API.
+# CORS — allow the Next.js front-end (Vercel & Localhost) to call this API.
 # ---------------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://your-production-domain.com",
+        "https://hotel-managment-black.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -118,3 +118,4 @@ if __name__ == "__main__":
         port=8000,
         reload=True,
     )
+    
