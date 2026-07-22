@@ -7,11 +7,13 @@ Routes
 ------
 GET    /inventory/             → list all ingredients (with optional low-stock filter)
 GET    /inventory/low-stock    → list only ingredients below their threshold
+GET    /inventory/audit        → full audit trail from v_inventory_audit view
 GET    /inventory/{id}         → get a single ingredient
 POST   /inventory/             → create a new ingredient
 PUT    /inventory/{id}         → update an ingredient (partial update supported)
 DELETE /inventory/{id}         → delete an ingredient
 """
+
 
 from __future__ import annotations
 
@@ -58,6 +60,45 @@ def list_low_stock_items(db: DB) -> list[InventoryItemResponse]:
         if r["stock_level"] < r["low_stock_threshold"]
     ]
     return low_stock
+
+
+# ---------------------------------------------------------------------------
+# GET /inventory/audit  — must be declared BEFORE /{id}
+# Returns the full v_inventory_audit view (audit trail of all stock changes).
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/audit",
+    summary="Full inventory audit trail (v_inventory_audit view)",
+    description=(
+        "Returns every row from the ``v_inventory_audit`` view, ordered newest-first. "
+        "Each row represents one stock change event (order deduction, manual restock, "
+        "waste write-off, etc.) and is joined with ingredient name, order details, "
+        "and the menu item that triggered the change."
+    ),
+)
+def list_inventory_audit(
+    db: DB,
+    skip:  int = Query(0,   ge=0,         description="Pagination offset."),
+    limit: int = Query(200, ge=1, le=1000, description="Max records to return."),
+) -> list[dict]:
+    """
+    Query the ``v_inventory_audit`` convenience view defined in the migration.
+
+    The view joins::
+
+        inventory_logs → store_inventory → orders → menu_items
+
+    and returns rows ordered ``created_at DESC``.
+    """
+    response = (
+        db.table("v_inventory_audit")
+        .select("*")
+        .order("created_at", desc=True)
+        .range(skip, skip + limit - 1)
+        .execute()
+    )
+    return response.data or []
 
 
 # ---------------------------------------------------------------------------

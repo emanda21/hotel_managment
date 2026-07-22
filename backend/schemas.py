@@ -145,6 +145,39 @@ class ErrorResponse(BaseModel):
 
 
 # =============================================================================
+# KDS (Kitchen Display System)
+# =============================================================================
+
+KITCHEN_STATUSES = {"new", "preparing", "served"}
+
+
+class KitchenStatusUpdate(BaseModel):
+    """Request body for PATCH /orders/{order_id}/kitchen-status."""
+
+    kitchen_status: str = Field(
+        ...,
+        description="New kitchen lifecycle state. Must be one of: 'new', 'preparing', 'served'.",
+        examples=["preparing"],
+    )
+
+
+class KitchenStatusResponse(BaseModel):
+    """Response returned after a successful kitchen-status PATCH."""
+
+    order_id: str
+    kitchen_status: str
+    message: str
+
+
+class ClearKitchenResponse(BaseModel):
+    """Response returned by POST /orders/clear-kitchen."""
+
+    message: str
+    cleared_count: int
+    cleared_date: str  # ISO date string (YYYY-MM-DD) of the day that was cleared
+
+
+# =============================================================================
 # orders / place_order
 # =============================================================================
 

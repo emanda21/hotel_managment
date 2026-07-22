@@ -11,8 +11,17 @@ Design
 - Route handlers receive the client through the ``get_db`` FastAPI dependency,
   which simply reads it from ``app.state``.  This avoids reconnecting on
   every request.
-- Lower-level helpers (fetch_recipe, deduct_stock, etc.) used by the
-  /place_order business-logic endpoint are also defined here.
+- Lower-level helpers (fetch_recipe, deduct_stock, write_inventory_log, etc.)
+  used by the /place_order business-logic endpoint are also defined here.
+
+Helper overview
+---------------
+fetch_menu_item        – validate menu item exists
+fetch_recipe           – load recipe lines joined with live stock data
+check_stock_sufficiency – validate all ingredients have enough stock
+deduct_stock           – UPDATE store_inventory + INSERT inventory_logs per line
+write_inventory_log    – INSERT one audit row into inventory_logs
+record_order           – INSERT into orders, return created row
 """
 
 from __future__ import annotations
@@ -167,32 +176,121 @@ def check_stock_sufficiency(
     return enriched
 
 
-def deduct_stock(client: Client, recipe_lines: list[dict[str, Any]]) -> None:
+def write_inventory_log(
+    client: Client,
+    inventory_id: str,
+    order_id: str,
+    change_amount: float,
+    reason: str = "ORDER_DEDUCTION",
+) -> None:
     """
-    Deduct ``total_required`` from ``stock_level`` for each ingredient.
+    Insert one audit row into ``inventory_logs``.
+
+    Parameters
+    ----------
+    inventory_id:
+        UUID of the ``store_inventory`` row that was modified.
+    order_id:
+        UUID of the ``orders`` row that triggered this deduction.
+    change_amount:
+        Signed delta — pass a *negative* value for a stock deduction
+        (e.g. ``-0.200`` for 200 g consumed) and a *positive* value
+        for a restock or correction.
+    reason:
+        Short reason code written to ``inventory_logs.reason``.
+        Defaults to ``'ORDER_DEDUCTION'``.
+    """
+    client.table("inventory_logs").insert(
+        {
+            "inventory_id":  inventory_id,
+            "order_id":      order_id,
+            "change_amount": change_amount,
+            "reason":        reason,
+        }
+    ).execute()
+
+
+def deduct_stock(
+    client: Client,
+    recipe_lines: list[dict[str, Any]],
+    order_id: str,
+) -> list[dict[str, Any]]:
+    """
+    Deduct ``total_required`` from ``stock_level`` for every ingredient
+    and write one ``inventory_logs`` audit row per deduction.
+
+    Parameters
+    ----------
+    recipe_lines:
+        Enriched lines returned by ``check_stock_sufficiency`` — each dict
+        must contain ``ingredient_id``, ``stock_level``, and
+        ``total_required``.
+    order_id:
+        UUID of the order that triggered these deductions, stored in
+        every ``inventory_logs`` row for traceability.
+
+    Returns
+    -------
+    list[dict]
+        The same *recipe_lines* list, with a ``remaining_stock`` key added
+        to each entry (useful for building the API response payload).
 
     .. note::
-        Each update is row-level atomic but the loop is not wrapped in a
-        single DB transaction. For high-concurrency production use, consider
-        replacing this with a Supabase RPC (stored procedure) that executes
-        all deductions inside one PostgreSQL transaction.
+        Each UPDATE + INSERT pair is individually atomic at the row level.
+        For strict all-or-nothing guarantees across *all* ingredients use
+        the ``place_order`` PostgreSQL RPC, which wraps everything inside
+        one database transaction.
     """
+    result: list[dict[str, Any]] = []
+
     for line in recipe_lines:
         new_level = round(line["stock_level"] - line["total_required"], 4)
-        client.table("store_inventory").update({"stock_level": new_level}).eq(
-            "id", line["ingredient_id"]
-        ).execute()
+
+        # 1. Deduct the stock level
+        client.table("store_inventory") \
+            .update({"stock_level": new_level}) \
+            .eq("id", line["ingredient_id"]) \
+            .execute()
+
+        # 2. Write the audit log entry (negative amount = consumed)
+        write_inventory_log(
+            client,
+            inventory_id=line["ingredient_id"],
+            order_id=order_id,
+            change_amount=-(line["total_required"]),
+            reason="ORDER_DEDUCTION",
+        )
+
+        result.append({**line, "remaining_stock": new_level})
+
+    return result
 
 
 def record_order(
     client: Client,
     menu_item_id: str,
     quantity: int,
+    table_number: int | None = None,
 ) -> dict[str, Any]:
-    """Insert a new order row and return the created record."""
+    """
+    Insert a new order row and return the created record.
+
+    Parameters
+    ----------
+    table_number:
+        Optional table number where the order originates. Written to
+        ``orders.table_number`` when provided.
+    """
+    payload: dict[str, Any] = {
+        "menu_item_id": menu_item_id,
+        "quantity":     quantity,
+    }
+    if table_number is not None:
+        payload["table_number"] = table_number
+
     response = (
         client.table("orders")
-        .insert({"menu_item_id": menu_item_id, "quantity": quantity})
+        .insert(payload)
         .execute()
     )
     return response.data[0]

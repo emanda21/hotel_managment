@@ -4,6 +4,7 @@ import {
   getInventory,
   getMenuItems,
   getOrders,
+  clearKitchen,
   createMenuItem,
   updateMenuItem,
   deleteMenuItem,
@@ -16,6 +17,8 @@ import {
   type OrderRecord,
 } from '../../services/api'
 import AnalyticsTab from './AnalyticsTab'
+import RecipesTab from './RecipesTab'
+import IngredientAuditTab from './IngredientAuditTab'
 
 export const dynamic = 'force-dynamic'
 
@@ -137,7 +140,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
 // ============================================================
 export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
-  const [activeTab, setActiveTab] = useState<'menu' | 'inventory' | 'orders' | 'analytics'>('menu')
+  const [activeTab, setActiveTab] = useState<'menu' | 'inventory' | 'orders' | 'analytics' | 'recipes' | 'audit' | 'activity'>('menu')
 
   // ── Menu Items state ───────────────────────────────────────
   const [items, setItems]         = useState<MenuItem[]>([])
@@ -161,10 +164,18 @@ export default function AdminPage() {
   const [invMsg, setInvMsg]             = useState('')
 
   // ── Orders (Live Kitchen Dashboard) state ─────────────────
-  const [orders, setOrders]             = useState<OrderRecord[]>([])
-  const [ordersLoading, setOrdersLoading] = useState(false)
-  const [ordersError, setOrdersError]   = useState('')
-  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
+  const [orders, setOrders]               = useState<OrderRecord[]>([])
+  const [ordersLoading, setOrdersLoading]   = useState(false)
+  const [ordersError, setOrdersError]       = useState('')
+  const [lastRefreshed, setLastRefreshed]   = useState<Date | null>(null)
+
+  // ── Clear Kitchen Board (admin action) ────────────────────
+  const [clearingKitchen, setClearingKitchen] = useState(false)
+  const [clearKitchenMsg, setClearKitchenMsg] = useState<{
+    type: 'success' | 'error'
+    text: string
+    count?: number
+  } | null>(null)
 
   // ── Session check ──────────────────────────────────────────
   useEffect(() => {
@@ -425,6 +436,24 @@ export default function AdminPage() {
           >
             📈 Analytics
           </button>
+          <button
+            className={`tab-btn ${activeTab === 'recipes' ? 'active' : ''}`}
+            onClick={() => setActiveTab('recipes')}
+          >
+            🧪 Recipes
+          </button>
+          <button
+            className={`tab-btn ${activeTab === 'audit' ? 'active' : ''}`}
+            onClick={() => setActiveTab('audit')}
+          >
+            🔍 Ingredient Audit
+          </button>
+          <button
+            className={`tab-btn ${activeTab === 'activity' ? 'active' : ''}`}
+            onClick={() => setActiveTab('activity')}
+          >
+            📋 Activity Log
+          </button>
         </div>
       </header>
 
@@ -603,6 +632,135 @@ export default function AdminPage() {
         ================================================================ */}
         {activeTab === 'orders' && (
           <>
+            {/* ── Clear Kitchen Board — Admin Action Panel ──────────── */}
+            <div style={{
+              background: 'rgba(197,168,128,0.04)',
+              border: '1px solid rgba(197,168,128,0.18)',
+              borderRadius: 14,
+              padding: '18px 22px',
+              marginBottom: 24,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 18,
+              flexWrap: 'wrap',
+            }}>
+              {/* Icon + copy */}
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <p style={{
+                  fontSize: 13, fontWeight: 700, color: '#C5A880',
+                  textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6,
+                }}>
+                  🧹 Clear Daily Kitchen Board
+                </p>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.6, margin: 0 }}>
+                  Hides all of today&apos;s <strong style={{ color: 'rgba(255,255,255,0.7)' }}>&ldquo;served&rdquo;</strong> orders
+                  from the Kitchen Display System.{' '}
+                  <span style={{ color: 'rgba(197,168,128,0.8)' }}>
+                    Records are never deleted — <code style={{ fontSize: 11, background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: 4 }}>is_kitchen_cleared</code> is
+                    set to <code style={{ fontSize: 11, background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: 4 }}>TRUE</code>,
+                    preserving all inventory audits and financial reports.
+                  </span>
+                </p>
+              </div>
+
+              {/* Action button */}
+              <button
+                id="clear-kitchen-board-btn"
+                disabled={clearingKitchen}
+                onClick={async () => {
+                  if (!confirm(
+                    'Clear today\'s served orders from the Kitchen Display?\n\n' +
+                    'This is a soft-hide — no records are deleted. ' +
+                    'All inventory deductions and financial data are preserved.'
+                  )) return
+
+                  setClearingKitchen(true)
+                  setClearKitchenMsg(null)
+                  try {
+                    const result = await clearKitchen()
+                    setClearKitchenMsg({
+                      type: 'success',
+                      text: result.message,
+                      count: result.cleared_count,
+                    })
+                    // Refresh the orders list so cleared items disappear
+                    fetchOrders()
+                  } catch {
+                    setClearKitchenMsg({
+                      type: 'error',
+                      text: 'Failed to clear the board. Is the FastAPI server running?',
+                    })
+                  } finally {
+                    setClearingKitchen(false)
+                    // Auto-dismiss the toast after 6 seconds
+                    setTimeout(() => setClearKitchenMsg(null), 6_000)
+                  }
+                }}
+                style={{
+                  flexShrink: 0,
+                  alignSelf: 'center',
+                  padding: '10px 20px',
+                  background: clearingKitchen ? 'rgba(255,255,255,0.04)' : 'rgba(197,168,128,0.1)',
+                  border: '1px solid rgba(197,168,128,0.35)',
+                  borderRadius: 8,
+                  color: clearingKitchen ? 'rgba(197,168,128,0.4)' : '#C5A880',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  cursor: clearingKitchen ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                {clearingKitchen
+                  ? <><span className="premium-spinner-sm" /> Clearing…</>
+                  : '🧹 Clear Board'}
+              </button>
+            </div>
+
+            {/* ── Toast notification ───────────────────────────────────── */}
+            {clearKitchenMsg && (
+              <div
+                className="premium-alert animate-fadeIn"
+                style={{
+                  marginBottom: 20,
+                  borderColor: clearKitchenMsg.type === 'success'
+                    ? 'rgba(74,222,128,0.35)'
+                    : 'rgba(239,68,68,0.4)',
+                  background: clearKitchenMsg.type === 'success'
+                    ? 'rgba(74,222,128,0.06)'
+                    : 'rgba(239,68,68,0.06)',
+                }}
+              >
+                <span style={{
+                  fontSize: 12, fontWeight: 700, textTransform: 'uppercase',
+                  letterSpacing: '0.08em', marginRight: 10,
+                  color: clearKitchenMsg.type === 'success' ? '#4ade80' : '#fca5a5',
+                }}>
+                  {clearKitchenMsg.type === 'success' ? '✓ Board Cleared' : '⚠ Error'}
+                </span>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)' }}>
+                  {clearKitchenMsg.text}
+                  {clearKitchenMsg.type === 'success' && clearKitchenMsg.count !== undefined && (
+                    <span style={{ marginLeft: 8, fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+                      ({clearKitchenMsg.count} order{clearKitchenMsg.count !== 1 ? 's' : ''} soft-hidden)
+                    </span>
+                  )}
+                </span>
+                <button
+                  style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer',
+                    color: clearKitchenMsg.type === 'success' ? '#4ade80' : '#fca5a5',
+                    fontWeight: 700, fontSize: 14 }}
+                  onClick={() => setClearKitchenMsg(null)}
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
             {/* Meta row: last refreshed + auto-poll notice */}
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
               <div>
@@ -697,6 +855,27 @@ export default function AdminPage() {
             TAB: ANALYTICS
         ================================================================ */}
         {activeTab === 'analytics' && <AnalyticsTab />}
+
+        {/* ================================================================
+            TAB: RECIPES
+        ================================================================ */}
+        {activeTab === 'recipes' && (
+          <RecipesTab menuItems={items} inventory={inventory} />
+        )}
+
+        {/* ================================================================
+            TAB: INGREDIENT AUDIT
+        ================================================================ */}
+        {activeTab === 'audit' && (
+          <IngredientAuditTab />
+        )}
+
+        {/* ================================================================
+            TAB: ACTIVITY LOG  (alias for audit — shows all reasons)
+        ================================================================ */}
+        {activeTab === 'activity' && (
+          <IngredientAuditTab filterReason={null} showAllReasons />
+        )}
 
       </div>
 
