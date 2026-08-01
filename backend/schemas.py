@@ -75,7 +75,17 @@ class MenuItemCreate(BaseModel):
     name: str = Field(..., min_length=1, description="Dish or beverage name.", examples=["Grilled Chicken"])
     description: str = Field("", description="Customer-facing description.")
     price: float = Field(..., ge=0, description="Selling price.", examples=[18.50])
-    category: str = Field(..., min_length=1, description="e.g. Starters, Mains, Drinks, Desserts.", examples=["Mains"])
+    category: str = Field(
+        ...,
+        min_length=1,
+        description=(
+            "Display grouping for the menu item. Accepted values include: "
+            "'Starters', 'Mains', 'Desserts', 'Drinks', 'Soft Drinks', "
+            "'Hot Drinks', 'Juices', 'Kids Menu'. "
+            "This is a free-text field — new categories can be added at any time."
+        ),
+        examples=["Mains"],
+    )
     image_url: Optional[str] = Field(None, description="Optional Supabase Storage URL for the dish image.")
 
 
@@ -159,6 +169,17 @@ class KitchenStatusUpdate(BaseModel):
         description="New kitchen lifecycle state. Must be one of: 'new', 'preparing', 'served'.",
         examples=["preparing"],
     )
+    prep_time_minutes: Optional[int] = Field(
+        None,
+        ge=1,
+        le=480,
+        description=(
+            "Estimated prep time in minutes (1–480). "
+            "Only used when kitchen_status = 'preparing'. "
+            "If provided, target_serve_time is computed as NOW() + this interval."
+        ),
+        examples=[15, 30],
+    )
 
 
 class KitchenStatusResponse(BaseModel):
@@ -198,8 +219,27 @@ class PlaceOrderRequest(BaseModel):
     table_number: Optional[int] = Field(
         None,
         ge=1,
-        description="Table number where the order originates. Optional but strongly encouraged.",
+        description="Dine-in table number. Optional — use room_number for in-room orders.",
         examples=[5],
+    )
+    room_number: Optional[str] = Field(
+        None,
+        min_length=1,
+        description="Hotel room number for in-room dining delivery.",
+        examples=["201"],
+    )
+    special_instructions: Optional[str] = Field(
+        None,
+        max_length=500,
+        description="Optional guest preparation notes forwarded to the kitchen (e.g. 'No onions').",
+        examples=["Extra spicy, no onions"],
+    )
+    waiter_id: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=100,
+        description="Waiter name or ID for dine-in table orders. NULL for room-service orders.",
+        examples=["Ahmed", "W-04"],
     )
 
 
@@ -230,6 +270,9 @@ class PlaceOrderResponse(BaseModel):
     menu_item_name: str
     quantity: int
     table_number: Optional[int] = None
+    room_number: Optional[str] = None
+    special_instructions: Optional[str] = None
+    waiter_id: Optional[str] = None
     created_at: str
     deductions: list[StockDeduction]
     low_stock_alerts: list[LowStockAlert] = []
@@ -252,3 +295,17 @@ class InsufficientStockResponse(BaseModel):
     error: str = "INSUFFICIENT_STOCK"
     message: str
     shortages: list[StockShortage]
+
+
+class MarkOrderServedResponse(BaseModel):
+    """
+    Success payload returned when PATCH /orders/{id}/kitchen-status transitions
+    an order to 'served'. Includes a full inventory deduction summary from the
+    mark_order_served Supabase RPC.
+    """
+
+    order_id: str
+    kitchen_status: str  # always 'served'
+    deductions: list[StockDeduction] = []
+    low_stock_alerts: list[LowStockAlert] = []
+    message: str = "Order marked as served. Inventory deducted."

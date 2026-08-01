@@ -48,12 +48,13 @@ export default function LandingPage() {
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-10">
             {[
-              { label: 'Home',    href: '#home' },
-              { label: 'Menu',    href: '/menu' },
-              { label: 'About',   href: '#about' },
-              { label: 'Contact', href: '#contact' },
-              { label: 'Kitchen', href: '/kitchen' },
-              { label: 'Admin',   href: '/admin' },
+              { label: 'Home',         href: '#home' },
+              { label: 'Menu',         href: '/menu' },
+              { label: 'Room Service', href: '/rooms' },
+              { label: 'About',        href: '#about' },
+              { label: 'Contact',      href: '#contact' },
+              { label: 'Kitchen',      href: '/kitchen' },
+              { label: 'Admin',        href: '/admin' },
             ].map((item) => (
               <a key={item.label} href={item.href}
                 className={`text-xs uppercase tracking-widest transition-colors duration-300 font-semibold hover:text-[#C5A880] ${
@@ -80,12 +81,13 @@ export default function LandingPage() {
         {/* Mobile menu */}
         {menuOpen && (
           <div className="md:hidden px-6 py-6 flex flex-col gap-5 mobile-menu-dropdown animate-fadeIn">
-            {['Home', 'Menu', 'About', 'Contact', 'Kitchen', 'Admin'].map((item) => (
+            {['Home', 'Menu', 'Room Service', 'About', 'Contact', 'Kitchen', 'Admin'].map((item) => (
               <a key={item}
                  href={
-                   item === 'Menu'    ? '/menu'
-                 : item === 'Admin'   ? '/admin'
-                 : item === 'Kitchen' ? '/kitchen'
+                   item === 'Menu'         ? '/menu'
+                 : item === 'Admin'        ? '/admin'
+                 : item === 'Kitchen'      ? '/kitchen'
+                 : item === 'Room Service' ? '/rooms'
                  : `#${item.toLowerCase()}`
                  }
                  className="text-xs uppercase tracking-widest text-white/90 hover:text-[#C5A880] transition-colors"

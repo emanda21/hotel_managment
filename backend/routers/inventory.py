@@ -17,7 +17,8 @@ DELETE /inventory/{id}         → delete an ingredient
 
 from __future__ import annotations
 
-from typing import Annotated
+from datetime import date, timedelta
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
@@ -79,8 +80,10 @@ def list_low_stock_items(db: DB) -> list[InventoryItemResponse]:
 )
 def list_inventory_audit(
     db: DB,
-    skip:  int = Query(0,   ge=0,         description="Pagination offset."),
-    limit: int = Query(200, ge=1, le=1000, description="Max records to return."),
+    skip:       int           = Query(0,    ge=0,         description="Pagination offset."),
+    limit:      int           = Query(200,  ge=1, le=1000, description="Max records to return."),
+    start_date: Optional[date] = Query(None, description="Filter from this date (inclusive), format YYYY-MM-DD."),
+    end_date:   Optional[date] = Query(None, description="Filter up to this date (inclusive), format YYYY-MM-DD."),
 ) -> list[dict]:
     """
     Query the ``v_inventory_audit`` convenience view defined in the migration.
@@ -90,14 +93,24 @@ def list_inventory_audit(
         inventory_logs → store_inventory → orders → menu_items
 
     and returns rows ordered ``created_at DESC``.
+
+    Optional date filters:
+      - ``start_date`` — only return rows with ``created_at >= start_date``
+      - ``end_date``   — only return rows with ``created_at <  end_date + 1 day``
+                         (i.e. end_date is inclusive)
     """
-    response = (
+    query = (
         db.table("v_inventory_audit")
         .select("*")
         .order("created_at", desc=True)
-        .range(skip, skip + limit - 1)
-        .execute()
     )
+    if start_date:
+        query = query.gte("created_at", start_date.isoformat())
+    if end_date:
+        query = query.lt("created_at", (end_date + timedelta(days=1)).isoformat())
+
+    query = query.range(skip, skip + limit - 1)
+    response = query.execute()
     return response.data or []
 
 

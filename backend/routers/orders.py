@@ -41,7 +41,8 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import date, timezone
+import traceback
+from datetime import date, datetime, timedelta, timezone
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -64,6 +65,7 @@ from schemas import (
     KitchenStatusResponse,
     KitchenStatusUpdate,
     LowStockAlert,
+    MarkOrderServedResponse,
     PlaceOrderRequest,
     PlaceOrderResponse,
     StockDeduction,
@@ -172,9 +174,12 @@ def place_order(body: PlaceOrderRequest, db: DB) -> Any:
         response = db.rpc(
             "place_order",
             {
-                "p_menu_item_id":  body.menu_item_id,
-                "p_quantity":      body.quantity,
-                "p_table_number": body.table_number,   # None if not provided
+                "p_menu_item_id":          body.menu_item_id,
+                "p_quantity":              body.quantity,
+                "p_table_number":          body.table_number,
+                "p_room_number":           body.room_number,
+                "p_special_instructions":  body.special_instructions,
+                "p_waiter_id":             body.waiter_id,
             },
         ).execute()
 
@@ -227,6 +232,9 @@ def place_order(body: PlaceOrderRequest, db: DB) -> Any:
         menu_item_name=payload["menu_item_name"],
         quantity=payload["quantity"],
         table_number=payload.get("table_number"),
+        room_number=payload.get("room_number"),
+        special_instructions=payload.get("special_instructions"),
+        waiter_id=payload.get("waiter_id"),
         created_at=str(payload["created_at"]),
         deductions=[
             StockDeduction(
@@ -341,52 +349,17 @@ def place_order_python(
         ) from exc
 
     logger.info(
-        "place_order_python | menu_item=%s (%s) qty=%d table=%s",
+        "place_order_python | menu_item=%s (%s) qty=%d room=%s",
         menu_item["name"],
         body.menu_item_id,
         body.quantity,
-        body.table_number,
+        body.room_number,
     )
 
     # ----------------------------------------------------------------
-    # Step 2 — Fetch recipe lines (with live stock data)
-    # ----------------------------------------------------------------
-    try:
-        recipe_lines = fetch_recipe(db, body.menu_item_id)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
-
-    logger.info(
-        "place_order_python | recipe has %d ingredient(s) for '%s'",
-        len(recipe_lines),
-        menu_item["name"],
-    )
-
-    # ----------------------------------------------------------------
-    # Step 3 — Check stock sufficiency (collects ALL shortages)
-    # ----------------------------------------------------------------
-    try:
-        enriched_lines = check_stock_sufficiency(recipe_lines, body.quantity)
-    except InsufficientStockError as exc:
-        logger.warning(
-            "place_order_python | INSUFFICIENT_STOCK for '%s': %s",
-            menu_item["name"],
-            [s["ingredient_name"] for s in exc.shortages],
-        )
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={
-                "error":    "INSUFFICIENT_STOCK",
-                "message":  "One or more ingredients have insufficient stock to fulfil this order.",
-                "shortages": exc.shortages,
-            },
-        )
-
-    # ----------------------------------------------------------------
-    # Step 4 — Record the order (obtains a stable order_id for the FK)
+    # Step 2 — Record the order (no stock check or deduction)
+    # Stock is now deducted atomically when the chef marks served via
+    # the mark_order_served RPC (called by PATCH kitchen-status).
     # ----------------------------------------------------------------
     order_row = record_order(
         db,
@@ -397,39 +370,13 @@ def place_order_python(
     order_id: str = order_row["id"]
 
     logger.info(
-        "place_order_python | order created order_id=%s",
+        "place_order_python | order created order_id=%s (deduction deferred to serve)",
         order_id,
     )
 
     # ----------------------------------------------------------------
-    # Step 5 — Deduct stock + write inventory_logs audit rows
-    # ----------------------------------------------------------------
-    deducted_lines = deduct_stock(db, enriched_lines, order_id)
-
-    logger.info(
-        "place_order_python | stock deducted and audit rows written for order_id=%s",
-        order_id,
-    )
-
-    # ----------------------------------------------------------------
-    # Step 6 — Detect and log low-stock alerts
-    # ----------------------------------------------------------------
-    low_stock_alerts: list[dict] = [
-        {
-            "ingredient_name":     line["ingredient_name"],
-            "unit":                line["unit"],
-            "new_stock_level":     line["remaining_stock"],
-            "low_stock_threshold": line.get("low_stock_threshold", 0),
-        }
-        for line in deducted_lines
-        # stock_level is the PRE-deduction value; remaining_stock is post-deduction
-        if line["remaining_stock"] <= line.get("low_stock_threshold", 0)
-    ]
-    if low_stock_alerts:
-        _print_low_stock_alerts(low_stock_alerts)
-
-    # ----------------------------------------------------------------
-    # Step 7 — Build and return the typed HTTP 201 response
+    # Return the response — deductions and low_stock_alerts are empty
+    # until the order is served.
     # ----------------------------------------------------------------
     return PlaceOrderResponse(
         order_id=order_id,
@@ -437,26 +384,12 @@ def place_order_python(
         menu_item_name=menu_item["name"],
         quantity=body.quantity,
         table_number=body.table_number,
+        room_number=body.room_number,
+        special_instructions=body.special_instructions,
+        waiter_id=body.waiter_id,
         created_at=str(order_row["created_at"]),
-        deductions=[
-            StockDeduction(
-                ingredient_id=line["ingredient_id"],
-                ingredient_name=line["ingredient_name"],
-                unit=line["unit"],
-                deducted=line["total_required"],
-                remaining_stock=line["remaining_stock"],
-            )
-            for line in deducted_lines
-        ],
-        low_stock_alerts=[
-            LowStockAlert(
-                ingredient_name=a["ingredient_name"],
-                unit=a["unit"],
-                new_stock_level=a["new_stock_level"],
-                low_stock_threshold=a["low_stock_threshold"],
-            )
-            for a in low_stock_alerts
-        ],
+        deductions=[],
+        low_stock_alerts=[],
     )
 
 
@@ -476,14 +409,16 @@ def list_orders(
 ) -> list[dict]:
     """
     Return orders newest-first, joined with the menu item name and price.
-    Includes table_number, kitchen_status, and is_kitchen_cleared so the
-    kitchen dashboard can display where to serve and track KDS state.
+    Includes table_number, room_number, special_instructions, kitchen_status,
+    and is_kitchen_cleared so the kitchen dashboard can display delivery
+    location, chef notes, and track KDS state.
     """
     response = (
         db.table("orders")
         .select(
-            "id, quantity, table_number, created_at, "
-            "kitchen_status, is_kitchen_cleared, "
+            "id, quantity, table_number, room_number, special_instructions, "
+            "waiter_id, created_at, kitchen_status, is_kitchen_cleared, "
+            "prep_time_minutes, target_serve_time, "
             "menu_items(name, price)"
         )
         .order("created_at", desc=True)
@@ -504,8 +439,15 @@ def list_orders(
     description=(
         "Sets the ``kitchen_status`` of the specified order to one of: "
         "``'new'``, ``'preparing'``, or ``'served'``.\n\n"
-        "**The financial ``status`` column is never modified by this endpoint.** "
-        "Only kitchen-display state is updated."
+        "When the status transitions to **``'served'``**, this endpoint calls the "
+        "``mark_order_served`` Supabase RPC, which atomically:\n"
+        "1. Updates ``kitchen_status`` → ``'served'``.\n"
+        "2. Deducts consumed quantities from ``store_inventory``.\n"
+        "3. Writes audit rows to ``inventory_logs`` "
+        "   (``reason = 'ORDER_SERVED_DEDUCTION'``).\n\n"
+        "Transitions to ``'new'`` or ``'preparing'`` use a plain UPDATE "
+        "(no stock changes).\n\n"
+        "**The financial ``status`` column is never modified by this endpoint.**"
     ),
     tags=["KDS"],
 )
@@ -515,16 +457,19 @@ def update_kitchen_status(
     db: DB,
 ) -> KitchenStatusResponse:
     """
-    Validates the requested status value against the allowed set, then issues
-    a targeted UPDATE on the ``orders`` table touching **only** the
-    ``kitchen_status`` column.
+    Routes the status transition:
 
-    Returns the updated order_id and new status on success.
+    - 'new' / 'preparing'  → plain UPDATE on orders.kitchen_status (no stock change)
+    - 'served'             → calls mark_order_served RPC (atomic status + deduction)
+
+    Returns KitchenStatusResponse on success.
     Raises:
-    - **422** if the status value is not one of 'new', 'preparing', 'served'.
-    - **404** if no order with that UUID exists.
+    - **422** for invalid status values.
+    - **404** if the order does not exist.
+    - **409** if the order is already served.
+    - **400** if stock is insufficient to fulfil the deduction (served path only).
     """
-    # Validate the value before hitting the DB (keeps the error user-friendly)
+    # Validate the value before hitting the DB
     if body.kitchen_status not in KITCHEN_STATUSES:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -534,9 +479,122 @@ def update_kitchen_status(
             ),
         )
 
+    # ──────────────────────────────────────────────────────────────────
+    # 'served' path — call mark_order_served RPC (atomic deduction)
+    # ──────────────────────────────────────────────────────────────────
+    if body.kitchen_status == "served":
+        logger.info(
+            "KDS | order_id=%s — calling mark_order_served RPC",
+            order_id,
+        )
+        print(f"[KDS DEBUG] mark_order_served RPC called for order_id={order_id}", flush=True)
+        try:
+            rpc_response = db.rpc(
+                "mark_order_served",
+                {"p_order_id": order_id},
+            ).execute()
+
+            # ── CRITICAL FIX: Supabase returns RPC results as a list ──────────
+            # rpc_response.data is [{ ... }] not { ... }.
+            # If we call .get() on a list we get AttributeError which then gets
+            # swallowed by the generic except block, making the deduction appear
+            # to succeed on the frontend while actually failing silently.
+            raw = rpc_response.data
+            print(f"[KDS DEBUG] mark_order_served raw response type={type(raw).__name__!r} value={raw!r}", flush=True)
+            logger.info("KDS | mark_order_served raw response: %r", raw)
+
+            if isinstance(raw, list):
+                payload: dict = raw[0] if raw else {}
+            elif isinstance(raw, dict):
+                payload = raw
+            else:
+                payload = {}
+
+        except Exception as exc:
+            error_str = str(exc)
+            tb_str = traceback.format_exc()
+
+            # Print full traceback so it is visible in server logs
+            print(f"[KDS ERROR] mark_order_served EXCEPTION for order_id={order_id}:", flush=True)
+            print(tb_str, flush=True)
+            logger.error(
+                "KDS | mark_order_served EXCEPTION for order_id=%s: %s\n%s",
+                order_id, error_str, tb_str,
+            )
+
+            if "ORDER_NOT_FOUND" in error_str:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Order '{order_id}' not found.",
+                ) from exc
+
+            if "ALREADY_SERVED" in error_str:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Order '{order_id}' has already been marked as served.",
+                ) from exc
+
+            if "INSUFFICIENT_STOCK" in error_str:
+                # Extract shortage JSON if present
+                _, _, shortages = _parse_rpc_error(error_str)
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content={
+                        "error":    "INSUFFICIENT_STOCK",
+                        "message":  "Cannot serve order: insufficient stock for one or more ingredients.",
+                        "shortages": shortages,
+                    },
+                )
+
+            logger.error("Unexpected DB error in mark_order_served RPC: %s", error_str)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Database error: {error_str}",
+            ) from exc
+
+        # Log low-stock alerts to the server console
+        alerts: list[dict] = payload.get("low_stock_alerts", [])
+        if alerts:
+            _print_low_stock_alerts(alerts)
+
+        deductions_count = len(payload.get("deductions", []))
+        print(f"[KDS DEBUG] mark_order_served SUCCESS — {deductions_count} deduction(s) for order_id={order_id}", flush=True)
+        logger.info(
+            "KDS | order_id=%s marked as served — %d ingredient(s) deducted",
+            order_id,
+            deductions_count,
+        )
+
+        return KitchenStatusResponse(
+            order_id=order_id,
+            kitchen_status="served",
+            message="Order marked as served. Inventory deducted.",
+        )
+
+    # ──────────────────────────────────────────────────────────────────
+    # 'new' / 'preparing' path — plain UPDATE, no stock changes
+    # ──────────────────────────────────────────────────────────────────
+    update_payload: dict[str, Any] = {"kitchen_status": body.kitchen_status}
+
+    # When transitioning to 'preparing', optionally save the chef's
+    # estimated prep time and compute the absolute deadline.
+    if body.kitchen_status == "preparing" and body.prep_time_minutes is not None:
+        target_dt = datetime.now(timezone.utc) + timedelta(minutes=body.prep_time_minutes)
+        update_payload["prep_time_minutes"]  = body.prep_time_minutes
+        update_payload["target_serve_time"]  = target_dt.isoformat()
+        print(
+            f"[KDS DEBUG] order_id={order_id} prep_time={body.prep_time_minutes}m "
+            f"target_serve_time={target_dt.isoformat()}",
+            flush=True,
+        )
+        logger.info(
+            "KDS | order_id=%s prep_time=%dm target_serve_time=%s",
+            order_id, body.prep_time_minutes, target_dt.isoformat(),
+        )
+
     response = (
         db.table("orders")
-        .update({"kitchen_status": body.kitchen_status})
+        .update(update_payload)
         .eq("id", order_id)
         .execute()
     )

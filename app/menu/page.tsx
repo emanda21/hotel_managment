@@ -1,5 +1,6 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { getMenuItems, placeOrder, type MenuItem as ApiMenuItem } from '../../services/api'
 
 // ==========================================
@@ -18,6 +19,7 @@ type CartItem = MenuItem & { quantity: number }
 
 const FOOD_CATEGORIES = ['Starters', 'Mains', 'Desserts']
 const DRINK_CATEGORIES = ['Soft Drinks', 'Hot Drinks', 'Juices', 'Drinks']
+const KIDS_CATEGORIES = ['Kids Menu']
 
 const FOOD_QUOTES = [
   { quote: "First we eat, then we do everything else.", author: "M.F.K. Fisher" },
@@ -41,8 +43,18 @@ const FOOD_QUOTES = [
 // identity across re-renders, so it no longer remounts while typing.
 // ==========================================
 type TableModalProps = {
+  isRoomService: boolean
+  // Room Service fields
+  roomInput: string
+  setRoomInput: (v: string) => void
+  // Dine-In fields
   tableInput: string
   setTableInput: (v: string) => void
+  waiterId: string
+  setWaiterId: (v: string) => void
+  // Shared
+  specialInstructions: string
+  setSpecialInstructions: (v: string) => void
   confirmOrder: () => void
   setShowTableModal: (v: boolean) => void
   placing: boolean
@@ -53,26 +65,109 @@ type TableModalProps = {
   addToCart: (item: MenuItem) => void
 }
 
-function TableModal({ tableInput, setTableInput, confirmOrder, setShowTableModal, placing, orderErrorMsg, cart, total, removeFromCart, addToCart }: TableModalProps) {
+function TableModal({
+  isRoomService,
+  roomInput, setRoomInput,
+  tableInput, setTableInput,
+  waiterId, setWaiterId,
+  specialInstructions, setSpecialInstructions,
+  confirmOrder, setShowTableModal,
+  placing, orderErrorMsg,
+  cart, total, removeFromCart, addToCart,
+}: TableModalProps) {
+  const MAX_CHARS = 300
+
+  // Confirm is valid when all required fields for the current mode are filled
+  const canConfirm = isRoomService
+    ? roomInput.trim().length > 0
+    : tableInput.trim().length > 0 && waiterId.trim().length > 0
+
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
       <div className="bg-[#FAF6EE] p-8 w-full max-w-sm text-center shadow-2xl rounded-2xl border border-[#C5A880]/20 premium-font-serif max-h-[90vh] overflow-y-auto">
+        {/* ── Ornament ── */}
         <div className="flex items-center gap-2 justify-center mb-4">
           <div className="h-px w-8 bg-[#C5A880]/40"></div>
           <span className="text-[#C5A880] text-xs">✦</span>
           <div className="h-px w-8 bg-[#C5A880]/40"></div>
         </div>
-        <h2 className="text-xl font-bold uppercase tracking-widest mb-1 text-[#111111] menu-item-title">Table Number</h2>
-        <p className="text-[#555555] text-xs mb-6 premium-font-sans menu-item-desc">Please enter your table number so we can place your order.</p>
-        <input
-          type="number" min={1} value={tableInput}
-          onChange={(e) => setTableInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && confirmOrder()}
-          className="border-b-2 bg-transparent w-full text-center py-2 mb-6 text-2xl outline-none border-[#C5A880] text-[#111111] font-bold transition-colors focus:border-black premium-font-sans"
-          placeholder="e.g. 5" autoFocus
-        />
 
-        {/* Selected items review — lets the customer confirm exactly what they're ordering */}
+        {/* ── Mode header ── */}
+        {isRoomService ? (
+          <>
+            <div className="text-2xl mb-2">🏨</div>
+            <h2 className="text-xl font-bold uppercase tracking-widest mb-1 text-[#111111] menu-item-title">Room Service</h2>
+            <p className="text-[#555555] text-xs mb-6 premium-font-sans menu-item-desc">Enter your room number for in-room delivery.</p>
+
+            {/* Room Number */}
+            <input
+              id="room-number-input"
+              type="text"
+              value={roomInput}
+              onChange={(e) => setRoomInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && confirmOrder()}
+              className="border-b-2 bg-transparent w-full text-center py-2 mb-6 text-2xl outline-none border-[#C5A880] text-[#111111] font-bold transition-colors focus:border-black premium-font-sans"
+              placeholder="e.g. 201" autoFocus
+            />
+          </>
+        ) : (
+          <>
+            <div className="text-2xl mb-2">🍽️</div>
+            <h2 className="text-xl font-bold uppercase tracking-widest mb-1 text-[#111111] menu-item-title">Table Dining</h2>
+            <p className="text-[#555555] text-xs mb-5 premium-font-sans menu-item-desc">Enter your table number and waiter to confirm.</p>
+
+            {/* Table Number */}
+            <div className="text-left mb-4 premium-font-sans">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[#555555] mb-2">
+                Table Number <span className="text-red-400">*</span>
+              </p>
+              <input
+                id="table-number-input"
+                type="number"
+                min={1}
+                value={tableInput}
+                onChange={(e) => setTableInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && confirmOrder()}
+                className="border-b-2 bg-transparent w-full text-center py-2 text-2xl outline-none border-[#C5A880] text-[#111111] font-bold transition-colors focus:border-black premium-font-sans"
+                placeholder="e.g. 5" autoFocus
+              />
+            </div>
+
+            {/* Waiter ID */}
+            <div className="text-left mb-5 premium-font-sans">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[#555555] mb-2">
+                Waiter ID / Name <span className="text-red-400">*</span>
+              </p>
+              <input
+                id="waiter-id-input"
+                type="text"
+                value={waiterId}
+                onChange={(e) => setWaiterId(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && confirmOrder()}
+                className="border-b-2 bg-transparent w-full text-center py-2 text-lg outline-none border-[#C5A880] text-[#111111] font-bold transition-colors focus:border-black premium-font-sans"
+                placeholder="e.g. Ahmed or W-04"
+              />
+            </div>
+          </>
+        )}
+
+        {/* ── Special Instructions (shared) ── */}
+        <div className="text-left mb-6 premium-font-sans">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[#555555] mb-2">
+            Special Instructions <span className="normal-case font-normal text-[#999]">(optional)</span>
+          </p>
+          <textarea
+            id="special-instructions-input"
+            value={specialInstructions}
+            onChange={(e) => setSpecialInstructions(e.target.value.slice(0, MAX_CHARS))}
+            placeholder="e.g. No onions, extra spicy, well done…"
+            rows={3}
+            className="w-full border border-[#C5A880]/40 bg-white/60 rounded-xl px-3 py-2.5 text-xs text-[#333] outline-none focus:border-[#C5A880] resize-none transition-colors duration-200 premium-font-sans"
+          />
+          <p className="text-right text-[9px] text-[#bbb] mt-1">{specialInstructions.length}/{MAX_CHARS}</p>
+        </div>
+
+        {/* ── Order review ── */}
         <div className="text-left mb-6 premium-font-sans">
           <p className="text-[10px] font-bold uppercase tracking-widest text-[#555555] mb-3">Your Order</p>
           <div className="flex flex-col gap-3 max-h-[180px] overflow-y-auto pr-1">
@@ -115,11 +210,20 @@ function TableModal({ tableInput, setTableInput, confirmOrder, setShowTableModal
         </div>
 
         {orderErrorMsg && (
-          <p className="text-red-600 text-xs mb-4 -mt-2 premium-font-sans font-semibold">{orderErrorMsg}</p>
+          <p className="text-red-600 text-xs mb-4 -mt-2 premium-font-sans font-semibold whitespace-pre-line">{orderErrorMsg}</p>
         )}
         <div className="flex gap-3 premium-font-sans">
-          <button className="flex-1 py-3 border border-[#C5A880] text-xs font-semibold uppercase tracking-wider rounded-xl text-[#111111] bg-transparent hover:bg-[#C5A880]/10 transition-colors duration-200" onClick={() => setShowTableModal(false)}>Cancel</button>
-          <button className="flex-1 py-3 text-white text-xs font-semibold uppercase tracking-wider rounded-xl bg-[#C5A880] hover:bg-[#b0936b] transition-colors duration-200 disabled:opacity-40" onClick={confirmOrder} disabled={!tableInput || Number(tableInput) <= 0 || placing || cart.length === 0}>
+          <button
+            className="flex-1 py-3 border border-[#C5A880] text-xs font-semibold uppercase tracking-wider rounded-xl text-[#111111] bg-transparent hover:bg-[#C5A880]/10 transition-colors duration-200"
+            onClick={() => setShowTableModal(false)}
+          >
+            Cancel
+          </button>
+          <button
+            className="flex-1 py-3 text-white text-xs font-semibold uppercase tracking-wider rounded-xl bg-[#C5A880] hover:bg-[#b0936b] transition-colors duration-200 disabled:opacity-40"
+            onClick={confirmOrder}
+            disabled={!canConfirm || placing || cart.length === 0}
+          >
             {placing ? 'Placing...' : 'Confirm'}
           </button>
         </div>
@@ -134,13 +238,25 @@ export default function MenuPage() {
   const [placing, setPlacing] = useState(false)
   const [orderPlaced, setOrderPlaced] = useState(false)
   const [showTableModal, setShowTableModal] = useState(false)
-  const [tableInput, setTableInput] = useState('')
+  // ── Order context: detected from localStorage on mount ─────────────────────
+  const [isRoomService, setIsRoomService]             = useState(false)
+  // Room Service fields
+  const [roomInput, setRoomInput]                     = useState('')
+  // Dine-In fields
+  const [tableInput, setTableInput]                   = useState('')
+  const [waiterId, setWaiterId]                       = useState('')
+  // Shared
+  const [specialInstructions, setSpecialInstructions] = useState('')
   const [orderErrorMsg, setOrderErrorMsg] = useState('')
   const [activeFoodCategory, setActiveFoodCategory] = useState<string>('All')
   const [activeDrinkCategory, setActiveDrinkCategory] = useState<string>('All')
+  const [activeKidsCategory, setActiveKidsCategory] = useState<string>('All')
   const [chatOpen, setChatOpen] = useState(false)
   const [chatMessages, setChatMessages] = useState<{ role: string; text: string }[]>([])
   const [chatInput, setChatInput] = useState('')
+
+  // ── NEW: Global search query ──────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Slideshow State (rotates every 5 seconds)
   const [slideshowIndex, setSlideshowIndex] = useState(0)
@@ -149,6 +265,45 @@ export default function MenuPage() {
 
   const [menuLoading, setMenuLoading] = useState(true)
   const [menuError,   setMenuError]   = useState('')
+
+  // ── Strict context detection (URL query param is the authority) ───────────
+  //
+  // HOW IT WORKS:
+  //   Room Service:  guest comes from /rooms page via router.push('/menu?room=5')
+  //                  → ?room= query param is present → Room Service mode
+  //   Dine-In:       waiter/guest opens /menu directly (no ?room= param)
+  //                  → ALWAYS Dine-In mode, regardless of any stale localStorage
+  //
+  // WHY URL OVER localStorage:
+  //   localStorage persists across sessions. A waiter opening /menu the day after
+  //   a room-service order was cancelled would incorrectly see Room Service mode.
+  //   The URL is session-scoped: it is only present when the guest literally just
+  //   navigated from /rooms. It cannot be stale.
+  //
+  // CLEANUP:
+  //   Dine-In access actively removes any stale selectedRoom from localStorage
+  //   so a future /menu?room=X visit starts clean.
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const roomParam = searchParams.get('room')
+
+    if (roomParam) {
+      // ── Room Service mode ──────────────────────────────────────────────
+      // URL param is present → guest came from /rooms. Set strict RS mode.
+      setIsRoomService(true)
+      setRoomInput(roomParam)
+      // Sync localStorage so a same-session refresh still auto-fills correctly
+      localStorage.setItem('selectedRoom', roomParam)
+    } else {
+      // ── Dine-In mode ───────────────────────────────────────────────────
+      // No URL param → strict Dine-In. Actively clear any stale room data
+      // so this cannot bleed into the current session from a previous visit.
+      setIsRoomService(false)
+      setRoomInput('')
+      localStorage.removeItem('selectedRoom')
+    }
+  }, [searchParams])
 
   useEffect(() => {
     async function fetchMenu() {
@@ -216,8 +371,10 @@ export default function MenuPage() {
   //  shortage list which we surface verbatim to the customer.
   // ============================================================
   async function confirmOrder() {
-    const tableNumber = Number(tableInput)
-    if (!tableNumber || tableNumber <= 0) return
+    // Validate required fields for the current order context
+    if (isRoomService && !roomInput.trim()) return
+    if (!isRoomService && (!tableInput.trim() || !waiterId.trim())) return
+
     setPlacing(true)
     setOrderErrorMsg('')
 
@@ -226,8 +383,27 @@ export default function MenuPage() {
 
     for (const cartItem of cart) {
       try {
-        // Pass table_number so the order is stored correctly in the DB.
-        await placeOrder(cartItem.id, cartItem.quantity, tableNumber)
+        if (isRoomService) {
+          // Room Service: pass room_number + special_instructions
+          await placeOrder(
+            cartItem.id,
+            cartItem.quantity,
+            undefined,                                  // table_number
+            roomInput.trim(),                           // room_number
+            specialInstructions.trim() || undefined,    // special_instructions
+            undefined,                                  // waiter_id
+          )
+        } else {
+          // Dine-In: pass table_number + waiter_id + special_instructions
+          await placeOrder(
+            cartItem.id,
+            cartItem.quantity,
+            Number(tableInput),                         // table_number
+            undefined,                                  // room_number
+            specialInstructions.trim() || undefined,    // special_instructions
+            waiterId.trim(),                            // waiter_id
+          )
+        }
         anySuccess = true
       } catch (err: unknown) {
         // ── Extract the most descriptive error text available ──────────
@@ -284,11 +460,16 @@ export default function MenuPage() {
     }
 
     if (shortageMessages.length === 0) {
-      // All items placed successfully
+      // All items placed successfully — clear cart and reset all fields
       setCart([])
       setOrderPlaced(true)
       setShowTableModal(false)
+      setRoomInput('')
       setTableInput('')
+      setWaiterId('')
+      setSpecialInstructions('')
+      // Clear room selection from localStorage (guest has placed the order)
+      if (isRoomService) localStorage.removeItem('selectedRoom')
     } else if (anySuccess && shortageMessages.length < cart.length) {
       // Partial success
       setOrderErrorMsg('⚠ Some items could not be placed:\n' + shortageMessages.join('\n'))
@@ -308,6 +489,10 @@ export default function MenuPage() {
       const drinks = menuItems.filter((i) => DRINK_CATEGORIES.includes(i.category))
       return drinks.length > 0 ? `Our drinks: ${drinks.map((d) => d.name).join(', ')}.` : "No drinks listed yet."
     }
+    if (q.includes('kids') || q.includes('children')) {
+      const kids = menuItems.filter((i) => KIDS_CATEGORIES.includes(i.category))
+      return kids.length > 0 ? `Kids Menu items: ${kids.map((d) => d.name).join(', ')}.` : 'No kids items listed yet.'
+    }
     if (q.includes('starter')) { const s = menuItems.filter((i) => i.category === 'Starters'); return s.length > 0 ? `Starters: ${s.map((d) => d.name).join(', ')}.` : 'No starters listed.' }
     if (q.includes('main')) { const m = menuItems.filter((i) => i.category === 'Mains'); return m.length > 0 ? `Mains: ${m.map((d) => d.name).join(', ')}.` : 'No mains listed.' }
     if (q.includes('dessert')) { const d = menuItems.filter((i) => i.category === 'Desserts'); return d.length > 0 ? `Desserts: ${d.map((d) => d.name).join(', ')}.` : 'No desserts listed.' }
@@ -315,7 +500,7 @@ export default function MenuPage() {
       return `Prices range from Br ${Math.min(...menuItems.map((i) => i.price))} to Br ${Math.max(...menuItems.map((i) => i.price))}.`
     }
     if (q.includes('menu') || q.includes('what do you have')) return menuItems.length > 0 ? `We have: ${menuItems.map((i) => i.name).join(', ')}.` : "No menu data yet."
-    return "Try asking about a specific dish, drinks, starters, mains, desserts, or prices!"
+    return "Try asking about a specific dish, drinks, starters, mains, desserts, kids menu, or prices!"
   }
 
   function sendChatMessage() {
@@ -325,17 +510,41 @@ export default function MenuPage() {
     setChatInput('')
   }
 
-  // Filter Food items
-  const foodItems = menuItems.filter((item) => FOOD_CATEGORIES.includes(item.category))
-  const filteredFoodItems = activeFoodCategory === 'All' 
-    ? foodItems 
-    : foodItems.filter((item) => item.category === activeFoodCategory)
+  // ── Derived: is search active? ────────────────────────────────────────────
+  const isSearching = searchQuery.trim().length > 0
+  const q = searchQuery.trim().toLowerCase()
 
-  // Filter Drink items
+  // Helper: match an item against the search query (name or description)
+  function matchesSearch(item: MenuItem): boolean {
+    return (
+      item.name.toLowerCase().includes(q) ||
+      item.description.toLowerCase().includes(q)
+    )
+  }
+
+  // ── Food panel items ──────────────────────────────────────────────────────
+  const foodItems = menuItems.filter((item) => FOOD_CATEGORIES.includes(item.category))
+  const filteredFoodItems = isSearching
+    ? foodItems.filter(matchesSearch)
+    : activeFoodCategory === 'All'
+      ? foodItems
+      : foodItems.filter((item) => item.category === activeFoodCategory)
+
+  // ── Drink panel items ─────────────────────────────────────────────────────
   const drinkItems = menuItems.filter((item) => DRINK_CATEGORIES.includes(item.category))
-  const filteredDrinkItems = activeDrinkCategory === 'All'
-    ? drinkItems
-    : drinkItems.filter((item) => item.category === activeDrinkCategory)
+  const filteredDrinkItems = isSearching
+    ? drinkItems.filter(matchesSearch)
+    : activeDrinkCategory === 'All'
+      ? drinkItems
+      : drinkItems.filter((item) => item.category === activeDrinkCategory)
+
+  // ── Kids panel items ──────────────────────────────────────────────────────
+  const kidsItems = menuItems.filter((item) => KIDS_CATEGORIES.includes(item.category))
+  const filteredKidsItems = isSearching
+    ? kidsItems.filter(matchesSearch)
+    : activeKidsCategory === 'All'
+      ? kidsItems
+      : kidsItems.filter((item) => item.category === activeKidsCategory)
 
   // Order confirmation view
   if (orderPlaced) {
@@ -378,7 +587,8 @@ export default function MenuPage() {
           {/* Split layout: left links, center logo, right links */}
           <div className="premium-nav-left">
             <a href="/">Home</a>
-            <a href="#hero" className="active" onClick={() => { setActiveFoodCategory('All'); setActiveDrinkCategory('All'); }}>Menu</a>
+            <a href="#hero" className="active" onClick={() => { setActiveFoodCategory('All'); setActiveDrinkCategory('All'); setActiveKidsCategory('All'); setSearchQuery('') }}>Menu</a>
+            <a href="/rooms">Room Service</a>
           </div>
           
           <span className="premium-logo">
@@ -388,6 +598,39 @@ export default function MenuPage() {
           <div className="premium-nav-right"></div>
         </div>
       </header>
+
+      {/* ── GLOBAL SEARCH BAR ── */}
+      <div className="search-bar-wrapper">
+        <div className="search-bar-inner">
+          <span className="search-icon">🔍</span>
+          <input
+            id="menu-search-input"
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search dishes, drinks, kids menu…"
+            className="search-input"
+            autoComplete="off"
+          />
+          {isSearching && (
+            <button
+              className="search-clear-btn"
+              onClick={() => setSearchQuery('')}
+              aria-label="Clear search"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        {isSearching && (
+          <p className="search-results-label">
+            Results for &ldquo;<span style={{ color: '#C5A880' }}>{searchQuery}</span>&rdquo;
+            &nbsp;—&nbsp;
+            {filteredFoodItems.length + filteredDrinkItems.length + filteredKidsItems.length} item
+            {filteredFoodItems.length + filteredDrinkItems.length + filteredKidsItems.length !== 1 ? 's' : ''} found
+          </p>
+        )}
+      </div>
 
       {/* Hero Interactive Dashboard Layout */}
       <div className="hero-dashboard-container">
@@ -448,7 +691,7 @@ export default function MenuPage() {
           {/* Rotating Quotes Box (10-second duration) */}
           <div className="rotating-quotes-box">
             <p className="quote-text animate-quoteFade" key={quoteIndex}>
-              "{currentQuote.quote}"
+              &ldquo;{currentQuote.quote}&rdquo;
             </p>
             <span className="quote-author">— {currentQuote.author}</span>
           </div>
@@ -458,18 +701,24 @@ export default function MenuPage() {
         <div className="hero-menu-panel animate-fadeIn" style={{ animationDelay: '0.1s' }}>
           <h3 className="scroll-menu-header">Explore Food</h3>
           
-          {/* Horizontal Food Categories Filter */}
-          <div className="scroll-category-tabs">
-            {['All', ...FOOD_CATEGORIES].map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setActiveFoodCategory(cat)}
-                className={`scroll-tab-link ${activeFoodCategory === cat ? 'active' : ''}`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
+          {/* Horizontal Food Categories Filter — hidden while searching */}
+          {!isSearching ? (
+            <div className="scroll-category-tabs">
+              {['All', ...FOOD_CATEGORIES].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveFoodCategory(cat)}
+                  className={`scroll-tab-link ${activeFoodCategory === cat ? 'active' : ''}`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="search-panel-label">
+              <span className="search-panel-tag">🔍 Searching</span>
+            </div>
+          )}
 
           <div className="scroll-menu-list">
             {filteredFoodItems.map((item) => {
@@ -508,27 +757,40 @@ export default function MenuPage() {
               )
             })}
             {filteredFoodItems.length === 0 && (
-              <p className="text-stone-400 italic mt-8 text-center text-xs">No food items listed in this section yet.</p>
+              <div className="panel-empty-state">
+                <span className="panel-empty-icon">🍽️</span>
+                <p className="panel-empty-text">
+                  {isSearching
+                    ? `No food matches "${searchQuery}"`
+                    : 'No food items listed in this section yet.'}
+                </p>
+              </div>
             )}
           </div>
         </div>
 
-        {/* Right Panel: Drinks Scrolled Menu */}
+        {/* Center-Right Panel: Drinks Scrolled Menu */}
         <div className="hero-menu-panel animate-fadeIn" style={{ animationDelay: '0.2s' }}>
           <h3 className="scroll-menu-header">Explore Drinks</h3>
           
-          {/* Horizontal Drink Categories Filter */}
-          <div className="scroll-category-tabs">
-            {['All', ...DRINK_CATEGORIES].map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setActiveDrinkCategory(cat)}
-                className={`scroll-tab-link ${activeDrinkCategory === cat ? 'active' : ''}`}
-              >
-                {cat === 'Soft Drinks' ? 'Soft' : cat === 'Hot Drinks' ? 'Hot' : cat}
-              </button>
-            ))}
-          </div>
+          {/* Horizontal Drink Categories Filter — hidden while searching */}
+          {!isSearching ? (
+            <div className="scroll-category-tabs">
+              {['All', ...DRINK_CATEGORIES].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveDrinkCategory(cat)}
+                  className={`scroll-tab-link ${activeDrinkCategory === cat ? 'active' : ''}`}
+                >
+                  {cat === 'Soft Drinks' ? 'Soft' : cat === 'Hot Drinks' ? 'Hot' : cat}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="search-panel-label">
+              <span className="search-panel-tag">🔍 Searching</span>
+            </div>
+          )}
 
           <div className="scroll-menu-list">
             {filteredDrinkItems.map((item) => {
@@ -567,7 +829,88 @@ export default function MenuPage() {
               )
             })}
             {filteredDrinkItems.length === 0 && (
-              <p className="text-stone-400 italic mt-8 text-center text-xs">No drinks listed in this section yet.</p>
+              <div className="panel-empty-state">
+                <span className="panel-empty-icon">🍹</span>
+                <p className="panel-empty-text">
+                  {isSearching
+                    ? `No drinks match "${searchQuery}"`
+                    : 'No drinks listed in this section yet.'}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Panel: Kids Menu Scrolled Menu */}
+        <div className="hero-menu-panel kids-menu-panel animate-fadeIn" style={{ animationDelay: '0.3s' }}>
+          <h3 className="scroll-menu-header">
+            <span className="kids-panel-icon">🧒</span> Explore Kids
+          </h3>
+          
+          {/* Kids Category Filter — hidden while searching */}
+          {!isSearching ? (
+            <div className="scroll-category-tabs">
+              {['All', ...KIDS_CATEGORIES].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveKidsCategory(cat)}
+                  className={`scroll-tab-link ${activeKidsCategory === cat ? 'active' : ''}`}
+                >
+                  {cat === 'Kids Menu' ? '🍟 Kids' : cat}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="search-panel-label">
+              <span className="search-panel-tag">🔍 Searching</span>
+            </div>
+          )}
+
+          <div className="scroll-menu-list">
+            {filteredKidsItems.map((item) => {
+              const inCart = cart.find((c) => c.id === item.id)
+              return (
+                <div key={item.id} className="scroll-menu-item">
+                  {item.image_url ? (
+                    <img src={item.image_url} alt={item.name} className="scroll-item-img" />
+                  ) : (
+                    <div className="scroll-item-placeholder">🍟</div>
+                  )}
+                  <div className="scroll-item-details">
+                    <div className="scroll-item-header">
+                      <span className="scroll-item-name">{item.name}</span>
+                      <span className="scroll-item-dots"></span>
+                      <span className="scroll-item-price">Br {item.price}</span>
+                    </div>
+                    <div className="scroll-item-footer">
+                      <p className="scroll-item-desc">{item.category}</p>
+                      <div className="scroll-item-action">
+                        {inCart ? (
+                          <div className="scroll-cart-controls">
+                            <button onClick={() => removeFromCart(item.id)}>-</button>
+                            <span>{inCart.quantity}</span>
+                            <button onClick={() => addToCart(item)}>+</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => addToCart(item)} className="scroll-add-btn">
+                            + Add
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+            {filteredKidsItems.length === 0 && (
+              <div className="panel-empty-state">
+                <span className="panel-empty-icon">🧒</span>
+                <p className="panel-empty-text">
+                  {isSearching
+                    ? `No kids items match "${searchQuery}"`
+                    : 'No kids items yet. Ask an admin to add some!'}
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -594,8 +937,15 @@ export default function MenuPage() {
 
       {showTableModal && (
         <TableModal
+          isRoomService={isRoomService}
+          roomInput={roomInput}
+          setRoomInput={setRoomInput}
           tableInput={tableInput}
           setTableInput={setTableInput}
+          waiterId={waiterId}
+          setWaiterId={setWaiterId}
+          specialInstructions={specialInstructions}
+          setSpecialInstructions={setSpecialInstructions}
           confirmOrder={confirmOrder}
           setShowTableModal={setShowTableModal}
           placing={placing}
@@ -774,18 +1124,173 @@ const STYLESHEET = `
 /* ======================================================== */
 
 /* ========================================================
+   GLOBAL SEARCH BAR
+   ======================================================== */
+.search-bar-wrapper {
+  position: relative;
+  z-index: 20;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 24px 6px;
+  box-sizing: border-box;
+}
+
+.search-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 640px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 10px 16px;
+  box-sizing: border-box;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.search-bar-inner:focus-within {
+  border-color: rgba(197, 168, 128, 0.6);
+  box-shadow: 0 0 0 3px rgba(197, 168, 128, 0.08), 0 8px 24px rgba(0,0,0,0.4);
+}
+
+.search-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  opacity: 0.7;
+  line-height: 1;
+}
+
+.search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: white;
+  font-size: 13px;
+  font-weight: 400;
+  font-family: 'Montserrat', system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  min-width: 0;
+}
+
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.search-clear-btn {
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  line-height: 1;
+  padding: 0;
+}
+
+.search-clear-btn:hover {
+  background: rgba(197, 168, 128, 0.25);
+  color: #C5A880;
+}
+
+.search-results-label {
+  margin: 6px 0 0;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.45);
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Shown inside each panel when search is active (replaces category tabs) */
+.search-panel-label {
+  padding: 8px 0 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.search-panel-tag {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #C5A880;
+  background: rgba(197, 168, 128, 0.1);
+  border-radius: 4px;
+  padding: 3px 8px;
+}
+
+/* Panel empty state */
+.panel-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 10px;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.panel-empty-icon {
+  font-size: 28px;
+  opacity: 0.4;
+}
+
+.panel-empty-text {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Kids panel accent */
+.kids-menu-panel {
+  border-color: rgba(197, 168, 128, 0.22) !important;
+  background: rgba(10, 6, 3, 0.72) !important;
+}
+
+.kids-panel-icon {
+  font-size: 14px;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+@media (max-width: 640px) {
+  .search-bar-wrapper {
+    padding: 8px 16px 4px;
+  }
+}
+
+/* ======================================================== */
+
+/* ========================================================
    HERO INTERACTIVE DASHBOARD STYLES
    ======================================================== */
 .hero-dashboard-container {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  max-width: 1240px;
+  max-width: 1400px;
   width: 100%;
   margin: auto;
   padding: 0 24px;
   box-sizing: border-box;
-  gap: 20px;
+  gap: 16px;
   z-index: 20;
   position: relative;
   flex: 1;
@@ -795,13 +1300,13 @@ const STYLESHEET = `
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 25%;
-  min-width: 280px;
+  width: 22%;
+  min-width: 240px;
   gap: 20px;
 }
 
 .hero-menu-panel {
-  width: 36%;
+  width: 26%;
   flex-grow: 1;
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(10px);
@@ -1007,8 +1512,8 @@ const STYLESHEET = `
 }
 
 .slideshow-square-box {
-  width: 280px;
-  height: 280px;
+  width: 240px;
+  height: 240px;
   position: relative;
   overflow: hidden;
   border-radius: 12px;
@@ -1062,7 +1567,7 @@ const STYLESHEET = `
 }
 
 .rotating-quotes-box {
-  width: 280px;
+  width: 240px;
   text-align: center;
   padding: 16px;
   background: rgba(0, 0, 0, 0.7);
@@ -1170,7 +1675,7 @@ const STYLESHEET = `
 }
 
 /* Responsive Viewport Hacks to allow scrolling on mobile */
-@media (max-width: 991px) {
+@media (max-width: 1100px) {
   .full-window-wrapper {
     height: auto !important;
     min-height: 100vh;
@@ -1180,15 +1685,40 @@ const STYLESHEET = `
   .hero-dashboard-container {
     flex-direction: column;
     align-items: center;
-    gap: 30px;
-    margin: 30px auto;
+    gap: 24px;
+    margin: 20px auto;
     padding: 0 16px;
     flex: none;
   }
   .hero-menu-panel {
     width: 100% !important;
-    max-width: 500px;
+    max-width: 560px;
     height: 360px;
+  }
+  .hero-left-dashboard {
+    width: 100%;
+    max-width: 560px;
+    min-width: unset;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .slideshow-square-box {
+    width: 220px;
+    height: 220px;
+  }
+  .rotating-quotes-box {
+    width: 220px;
+  }
+}
+
+@media (max-width: 500px) {
+  .slideshow-square-box {
+    width: 160px;
+    height: 160px;
+  }
+  .rotating-quotes-box {
+    width: 160px;
   }
 }
 `

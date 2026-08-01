@@ -29,7 +29,7 @@ const ADMIN_USERNAME = 'admin'      // ← Change this to your admin name
 const ADMIN_PASSWORD = 'daris2024'  // ← Change this to your password
 // ============================================================
 
-const CATEGORIES = ['Starters', 'Mains', 'Desserts', 'Soft Drinks', 'Hot Drinks', 'Juices', 'Drinks']
+const CATEGORIES = ['Starters', 'Mains', 'Desserts', 'Soft Drinks', 'Hot Drinks', 'Juices', 'Drinks', 'Kids Menu']
 const UNITS      = ['KG', 'Liter', 'Gram', 'Pcs', 'Spoon', 'Cup', 'ml', 'Bag']
 
 const EMPTY_MENU_FORM: MenuItemCreate = {
@@ -162,6 +162,12 @@ export default function AdminPage() {
   const [showInvForm, setShowInvForm]   = useState(false)
   const [invSaving, setInvSaving]       = useState(false)
   const [invMsg, setInvMsg]             = useState('')
+
+  // ── Inventory filter state (client-side only — no extra API calls) ─────────
+  const [invSearch, setInvSearch]           = useState('')
+  const [invStockFilter, setInvStockFilter] = useState<'all' | 'low' | 'under50' | 'over50'>('all')
+  const [invFromDate, setInvFromDate]       = useState('')   // YYYY-MM-DD
+  const [invToDate,   setInvToDate]         = useState('')   // YYYY-MM-DD
 
   // ── Orders (Live Kitchen Dashboard) state ─────────────────
   const [orders, setOrders]               = useState<OrderRecord[]>([])
@@ -372,6 +378,27 @@ export default function AdminPage() {
 
   const lowStockCount = inventory.filter(i => i.is_low_stock).length
 
+  // Derived filtered inventory — updates instantly as the user types / clicks
+  const displayedInventory = inventory
+    .filter(i => i.name.toLowerCase().includes(invSearch.trim().toLowerCase()))
+    .filter(i => {
+      if (invStockFilter === 'low')     return i.is_low_stock
+      if (invStockFilter === 'under50') return i.stock_level < (i.low_stock_threshold * 0.5)
+      if (invStockFilter === 'over50')  return i.stock_level >= (i.low_stock_threshold * 0.5)
+      return true
+    })
+    .filter(i => {
+      // Date range filter on created_at (when ingredient was added to the system)
+      if (!invFromDate && !invToDate) return true
+      const created = new Date(i.created_at ?? '').getTime()
+      if (invFromDate && created < new Date(invFromDate).getTime()) return false
+      if (invToDate) {
+        const endMs = new Date(invToDate).getTime() + 86_400_000 // inclusive end
+        if (created >= endMs) return false
+      }
+      return true
+    })
+
   // ============================================================
   //  RENDER
   // ============================================================
@@ -413,13 +440,10 @@ export default function AdminPage() {
             🍽️ Menu Items
           </button>
           <button
-            className={`tab-btn ${activeTab === 'inventory' ? 'active' : ''}`}
-            onClick={() => setActiveTab('inventory')}
+            className={`tab-btn ${activeTab === 'recipes' ? 'active' : ''}`}
+            onClick={() => setActiveTab('recipes')}
           >
-            📦 Store Inventory
-            {lowStockCount > 0 && (
-              <span className="low-stock-badge">{lowStockCount} low</span>
-            )}
+            🧪 Recipes
           </button>
           <button
             className={`tab-btn ${activeTab === 'orders' ? 'active' : ''}`}
@@ -431,28 +455,31 @@ export default function AdminPage() {
             )}
           </button>
           <button
-            className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
-            onClick={() => setActiveTab('analytics')}
-          >
-            📈 Analytics
-          </button>
-          <button
-            className={`tab-btn ${activeTab === 'recipes' ? 'active' : ''}`}
-            onClick={() => setActiveTab('recipes')}
-          >
-            🧪 Recipes
-          </button>
-          <button
             className={`tab-btn ${activeTab === 'audit' ? 'active' : ''}`}
             onClick={() => setActiveTab('audit')}
           >
             🔍 Ingredient Audit
           </button>
           <button
+            className={`tab-btn ${activeTab === 'inventory' ? 'active' : ''}`}
+            onClick={() => setActiveTab('inventory')}
+          >
+            📦 Store Inventory
+            {lowStockCount > 0 && (
+              <span className="low-stock-badge">{lowStockCount} low</span>
+            )}
+          </button>
+          <button
             className={`tab-btn ${activeTab === 'activity' ? 'active' : ''}`}
             onClick={() => setActiveTab('activity')}
           >
             📋 Activity Log
+          </button>
+          <button
+            className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
+            onClick={() => setActiveTab('analytics')}
+          >
+            📈 Analytics
           </button>
         </div>
       </header>
@@ -583,46 +610,149 @@ export default function AdminPage() {
                 <button className="premium-add-btn mx-auto" onClick={startAddInv}>+ Add First Ingredient</button>
               </div>
             ) : (
-              <div className="inv-table-wrapper animate-fadeIn">
-                <table className="inv-table">
-                  <thead>
-                    <tr>
-                      <th>Ingredient</th>
-                      <th>Unit</th>
-                      <th>Stock Level</th>
-                      <th>Min. Threshold</th>
-                      <th>Cost / Unit</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {inventory.map(item => (
-                      <tr key={item.id} className={item.is_low_stock ? 'low-stock-row' : ''}>
-                        <td className="inv-name">{item.name}</td>
-                        <td className="inv-unit">{item.unit}</td>
-                        <td className={item.is_low_stock ? 'inv-stock-low' : 'inv-stock-ok'}>
-                          {item.stock_level}
-                        </td>
-                        <td className="inv-threshold">{item.low_stock_threshold}</td>
-                        <td className="inv-cost">Br {item.cost_per_unit}</td>
-                        <td>
-                          {item.is_low_stock
-                            ? <span className="status-badge low">⚠ Low Stock</span>
-                            : <span className="status-badge ok">✓ OK</span>
-                          }
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            <button className="action-btn-edit" onClick={() => startEditInv(item)}>Edit</button>
-                            <button className="action-btn-delete" onClick={() => handleDeleteInventory(item.id)}>Del</button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                {/* ── Search + Filter Controls ─────────────────────────────── */}
+                <div className="inv-controls-row animate-fadeIn">
+
+                  {/* Search bar */}
+                  <div className="inv-search-bar-row">
+                    <span className="inv-search-icon">🔍</span>
+                    <input
+                      id="inv-search-input"
+                      className="inv-search-input"
+                      type="text"
+                      value={invSearch}
+                      onChange={e => { setInvSearch(e.target.value); setInvStockFilter('all') }}
+                      placeholder="Search by ingredient name…"
+                      autoComplete="off"
+                    />
+                    {invSearch && (
+                      <button className="inv-search-clear" onClick={() => setInvSearch('')} aria-label="Clear search">✕</button>
+                    )}
+                  </div>
+
+                  {/* Quick-filter pill row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>Filter:</span>
+                    <div className="inv-filter-bar">
+                      {([
+                        { key: 'all',     label: 'All' },
+                        { key: 'low',     label: '⚠ Low Stock' },
+                        { key: 'under50', label: '< 50%' },
+                        { key: 'over50',  label: '> 50%' },
+                      ] as const).map(f => (
+                        <button
+                          key={f.key}
+                          id={`inv-filter-${f.key}`}
+                          className={`inv-filter-btn ${invStockFilter === f.key ? 'active' : ''}`}
+                          onClick={() => setInvStockFilter(f.key)}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Live match count badge */}
+                    <span className="inv-count-badge">
+                      {displayedInventory.length} / {inventory.length} ingredient{inventory.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                </div>
+
+                {/* ── Date Range Filter ──────────────────────────────── */}
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap', marginBottom: 16, padding: '14px 16px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(197,168,128,0.1)', borderRadius: 10 }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.3)', flexShrink: 0, paddingBottom: 2 }}>Date Added:</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>From</label>
+                    <input
+                      id="inv-date-from"
+                      type="date"
+                      value={invFromDate}
+                      max={invToDate || new Date().toISOString().slice(0, 10)}
+                      onChange={e => setInvFromDate(e.target.value)}
+                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(197,168,128,0.2)', borderRadius: 7, color: 'rgba(255,255,255,0.75)', fontSize: 12, padding: '6px 10px', outline: 'none', colorScheme: 'dark', cursor: 'pointer', minWidth: 130 }}
+                    />
+                  </div>
+                  <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, paddingBottom: 7 }}>→</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>To</label>
+                    <input
+                      id="inv-date-to"
+                      type="date"
+                      value={invToDate}
+                      min={invFromDate || undefined}
+                      max={new Date().toISOString().slice(0, 10)}
+                      onChange={e => setInvToDate(e.target.value)}
+                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(197,168,128,0.2)', borderRadius: 7, color: 'rgba(255,255,255,0.75)', fontSize: 12, padding: '6px 10px', outline: 'none', colorScheme: 'dark', cursor: 'pointer', minWidth: 130 }}
+                    />
+                  </div>
+                  {(invFromDate || invToDate) && (
+                    <>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(197,168,128,0.7)', background: 'rgba(197,168,128,0.07)', border: '1px solid rgba(197,168,128,0.2)', borderRadius: 5, padding: '4px 10px', letterSpacing: '0.05em', alignSelf: 'flex-end', marginBottom: 2 }}>
+                        {displayedInventory.length} result{displayedInventory.length !== 1 ? 's' : ''}
+                      </span>
+                      <button
+                        style={{ alignSelf: 'flex-end', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: 'rgba(255,255,255,0.35)', fontSize: 10, padding: '6px 10px', cursor: 'pointer', marginBottom: 2 }}
+                        onClick={() => { setInvFromDate(''); setInvToDate('') }}
+                      >✕ Clear</button>
+                    </>
+                  )}
+                </div>
+                {/* ── Table or no-results state ──────────────────────────── */}
+                {displayedInventory.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '52px 0', border: '1px dashed rgba(197,168,128,0.2)', borderRadius: 14, background: 'rgba(255,255,255,0.015)' }}>
+                    <span style={{ fontSize: 32, display: 'block', marginBottom: 12, opacity: 0.5 }}>🔎</span>
+                    <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>No ingredients match your current filter.</p>
+                    <button
+                      style={{ background: 'transparent', border: '1px solid rgba(197,168,128,0.35)', color: '#C5A880', borderRadius: 6, padding: '7px 18px', fontSize: 10, fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em', transition: 'all 0.2s ease' }}
+                      onClick={() => { setInvSearch(''); setInvStockFilter('all') }}
+                    >
+                      Clear Filters
+                    </button>
+                  </div>
+                ) : (
+                  <div className="inv-table-wrapper animate-fadeIn">
+                    <table className="inv-table">
+                      <thead>
+                        <tr>
+                          <th>Ingredient</th>
+                          <th>Unit</th>
+                          <th>Stock Level</th>
+                          <th>Min. Threshold</th>
+                          <th>Cost / Unit</th>
+                          <th>Status</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {displayedInventory.map(item => (
+                          <tr key={item.id} className={item.is_low_stock ? 'low-stock-row' : ''}>
+                            <td className="inv-name">{item.name}</td>
+                            <td className="inv-unit">{item.unit}</td>
+                            <td className={item.is_low_stock ? 'inv-stock-low' : 'inv-stock-ok'}>
+                              {item.stock_level}
+                            </td>
+                            <td className="inv-threshold">{item.low_stock_threshold}</td>
+                            <td className="inv-cost">Br {item.cost_per_unit}</td>
+                            <td>
+                              {item.is_low_stock
+                                ? <span className="status-badge low">⚠ Low Stock</span>
+                                : <span className="status-badge ok">✓ OK</span>
+                              }
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button className="action-btn-edit" onClick={() => startEditInv(item)}>Edit</button>
+                                <button className="action-btn-delete" onClick={() => handleDeleteInventory(item.id)}>Del</button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
@@ -1123,6 +1253,21 @@ const STYLESHEET = [
   ".status-badge { font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap; }",
   ".status-badge.ok { background:rgba(134,239,172,0.12);color:#86efac;border:1px solid rgba(134,239,172,0.25); }",
   ".status-badge.low { background:rgba(239,68,68,0.1);color:#fca5a5;border:1px solid rgba(239,68,68,0.3); }",
+
+  // ── Inventory search + filter controls ─────────────────────────────────────
+  ".inv-controls-row { display:flex;flex-direction:column;gap:14px;margin-bottom:22px; }",
+  ".inv-search-bar-row { display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 14px;transition:border-color 0.2s ease,box-shadow 0.2s ease; }",
+  ".inv-search-bar-row:focus-within { border-color:rgba(197,168,128,0.55);box-shadow:0 0 0 3px rgba(197,168,128,0.07); }",
+  ".inv-search-icon { font-size:13px;opacity:0.6;flex-shrink:0;line-height:1; }",
+  ".inv-search-input { flex:1;background:transparent;border:none;outline:none;font-size:13px;color:white;font-family:'Montserrat',system-ui,sans-serif;letter-spacing:0.01em; }",
+  ".inv-search-input::placeholder { color:rgba(255,255,255,0.28); }",
+  ".inv-search-clear { flex-shrink:0;background:rgba(255,255,255,0.08);border:none;color:rgba(255,255,255,0.45);font-size:10px;cursor:pointer;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;line-height:1;padding:0; }",
+  ".inv-search-clear:hover { background:rgba(197,168,128,0.2);color:#C5A880; }",
+  ".inv-filter-bar { display:flex;gap:8px;flex-wrap:wrap; }",
+  ".inv-filter-btn { padding:5px 13px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;border:1px solid rgba(255,255,255,0.12);background:transparent;color:rgba(255,255,255,0.45);border-radius:20px;cursor:pointer;transition:all 0.2s ease;white-space:nowrap; }",
+  ".inv-filter-btn:hover { border-color:rgba(197,168,128,0.45);color:#C5A880;background:rgba(197,168,128,0.06); }",
+  ".inv-filter-btn.active { background:rgba(197,168,128,0.13);border-color:rgba(197,168,128,0.55);color:#C5A880;box-shadow:0 0 0 1px rgba(197,168,128,0.15); }",
+  ".inv-count-badge { font-size:10px;font-weight:700;color:rgba(197,168,128,0.75);text-transform:uppercase;letter-spacing:0.1em;background:rgba(197,168,128,0.07);border:1px solid rgba(197,168,128,0.2);border-radius:5px;padding:4px 10px;white-space:nowrap; }",
 
   // Modal
   ".premium-form-modal { background:#111111;border:1px solid rgba(197,168,128,0.3);border-radius:16px;box-shadow:0 25px 60px rgba(0,0,0,0.8);box-sizing:border-box;animation:modalScaleIn 0.3s cubic-bezier(0.16,1,0.3,1) forwards; }",

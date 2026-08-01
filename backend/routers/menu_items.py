@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from database import get_db
 from schemas import (
@@ -42,15 +42,19 @@ DB = Annotated[object, Depends(get_db)]
     response_model=list[str],
     summary="List all distinct menu categories",
 )
-def list_categories(db: DB) -> list[str]:
+def list_categories(request: Request, db: DB) -> list[str]:
     """
     Returns a sorted list of unique category strings present in the menu.
-    Useful for populating filter tabs on the customer-facing menu page.
+    Served from the in-memory cache (warmed at startup) for instant response.
+    Falls back to a live Supabase query if the cache is not yet populated.
     """
+    cache = getattr(request.app.state, "menu_cache", {})
+    if cache.get("categories"):
+        return cache["categories"]
+    # Cache miss fallback (first few ms after cold start)
     response = db.table("menu_items").select("category").execute()
     rows = response.data or []
-    categories = sorted({r["category"] for r in rows})
-    return categories
+    return sorted({r["category"] for r in rows})
 
 
 # ---------------------------------------------------------------------------
@@ -63,6 +67,7 @@ def list_categories(db: DB) -> list[str]:
     summary="List all menu items",
 )
 def list_menu_items(
+    request: Request,
     db: DB,
     category: Optional[str] = Query(None, description="Filter by category (e.g. Mains, Drinks)."),
     skip: int = Query(0, ge=0, description="Number of records to skip (pagination)."),
@@ -70,8 +75,27 @@ def list_menu_items(
 ) -> list[MenuItemResponse]:
     """
     Retrieve all menu items, ordered by category then name.
-    Optionally filter by ``category`` and paginate with ``skip`` / ``limit``.
+    Served from the in-memory cache for an instant first response.
+    The cache is refreshed every 30 s in the background, so menu edits
+    made in the admin panel appear to customers within half a minute.
+
+    When a category filter or non-zero skip is requested, the result is
+    computed from the cached list (no Supabase round-trip needed).
     """
+    cache = getattr(request.app.state, "menu_cache", {})
+    cached_items: list[dict] = cache.get("items", [])
+
+    if cached_items:
+        # Serve from cache — apply category filter + pagination in Python
+        filtered = (
+            [r for r in cached_items if r.get("category") == category]
+            if category
+            else cached_items
+        )
+        page = filtered[skip: skip + limit]
+        return [MenuItemResponse(**r) for r in page]
+
+    # Cache miss fallback — identical to the original logic
     query = (
         db.table("menu_items")
         .select("*")
@@ -79,10 +103,8 @@ def list_menu_items(
         .order("name")
         .range(skip, skip + limit - 1)
     )
-
     if category:
         query = query.eq("category", category)
-
     response = query.execute()
     return [MenuItemResponse(**r) for r in (response.data or [])]
 

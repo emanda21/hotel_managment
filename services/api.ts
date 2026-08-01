@@ -190,11 +190,17 @@ export async function placeOrder(
   menuItemId: string,
   quantity: number,
   tableNumber?: number,
+  roomNumber?: string,
+  specialInstructions?: string,
+  waiterId?: string,
 ): Promise<PlaceOrderResponse> {
   const { data } = await api.post<PlaceOrderResponse>('/place_order', {
-    menu_item_id:  menuItemId,
+    menu_item_id:          menuItemId,
     quantity,
-    table_number: tableNumber ?? null,
+    table_number:          tableNumber ?? null,
+    room_number:           roomNumber  ?? null,
+    special_instructions:  specialInstructions ?? null,
+    waiter_id:             waiterId    ?? null,
   })
   return data
 }
@@ -207,9 +213,16 @@ export type OrderRecord = {
   id: string
   quantity: number
   table_number: number | null
+  room_number: string | null
+  special_instructions: string | null
+  waiter_id: string | null
   created_at: string
   kitchen_status: 'new' | 'preparing' | 'served'
   is_kitchen_cleared: boolean
+  /** Minutes the chef estimated for preparation (set on NEW → PREPARING). */
+  prep_time_minutes: number | null
+  /** UTC ISO timestamp deadline = acceptance time + prep_time_minutes. */
+  target_serve_time: string | null
   menu_items: {
     name:  string
     price: number
@@ -244,19 +257,26 @@ export async function getKitchenOrders(): Promise<OrderRecord[]> {
   return data.filter((o) => !o.is_kitchen_cleared)
 }
 
-export type KitchenStatusPayload = { kitchen_status: 'new' | 'preparing' | 'served' }
+export type KitchenStatusPayload = {
+  kitchen_status: 'new' | 'preparing' | 'served'
+  prep_time_minutes?: number | null
+}
 export type KitchenStatusResponse = { order_id: string; kitchen_status: string; message: string }
 
 /**
  * PATCH /orders/{order_id}/kitchen-status — Move an order to the next KDS state.
+ * @param prepTimeMinutes  Optional chef-estimated prep time (only for 'preparing' transition).
  */
 export async function updateKitchenStatus(
   orderId: string,
   kitchenStatus: 'new' | 'preparing' | 'served',
+  prepTimeMinutes?: number | null,
 ): Promise<KitchenStatusResponse> {
+  const body: KitchenStatusPayload = { kitchen_status: kitchenStatus }
+  if (prepTimeMinutes != null) body.prep_time_minutes = prepTimeMinutes
   const { data } = await api.patch<KitchenStatusResponse>(
     `/orders/${orderId}/kitchen-status`,
-    { kitchen_status: kitchenStatus },
+    body,
   )
   return data
 }
@@ -363,14 +383,27 @@ export type InventoryLog = {
   order_quantity: number | null
 }
 
+export interface AuditParams {
+  limit?: number
+  skip?: number
+  start_date?: string | null   // YYYY-MM-DD, inclusive
+  end_date?: string | null     // YYYY-MM-DD, inclusive
+}
+
 /**
- * GET /inventory/audit — Returns the full audit trail from v_inventory_audit view,
- * newest first. Supports limit/skip pagination.
+ * GET /inventory/audit — Returns the audit trail from v_inventory_audit view,
+ * newest first. Supports limit/skip pagination and optional date-range filtering.
  */
-export async function getIngredientAudit(limit = 200, skip = 0): Promise<InventoryLog[]> {
-  const { data } = await api.get<InventoryLog[]>('/inventory/audit', {
-    params: { limit, skip },
-  })
+export async function getIngredientAudit({
+  limit = 500,
+  skip = 0,
+  start_date,
+  end_date,
+}: AuditParams = {}): Promise<InventoryLog[]> {
+  const params: Record<string, unknown> = { limit, skip }
+  if (start_date) params.start_date = start_date
+  if (end_date)   params.end_date   = end_date
+  const { data } = await api.get<InventoryLog[]>('/inventory/audit', { params })
   return data
 }
 
