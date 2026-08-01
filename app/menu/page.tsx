@@ -232,7 +232,10 @@ function TableModal({
   )
 }
 
-export default function MenuPage() {
+// MenuPageInner contains useSearchParams() and all the interactive logic.
+// It MUST live inside a <Suspense> boundary (see MenuPage below) so that
+// Next.js / Vercel can build the page without failing on the useSearchParams call.
+function MenuPageInner() {
   const [items, setItems] = useState<MenuItem[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
   const [placing, setPlacing] = useState(false)
@@ -1006,6 +1009,49 @@ export default function MenuPage() {
         </div>
       )}
     </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Suspense boundary wrapper — REQUIRED for Vercel / Next.js builds.
+//
+// Next.js mandates that any component calling useSearchParams() must be
+// rendered inside a <Suspense> boundary, or the build fails with:
+//   "useSearchParams() should be wrapped in a suspense boundary at page /menu"
+//
+// Pattern: MenuPageInner owns all the logic (including useSearchParams).
+//          MenuPage (the page-level default export) wraps it in <Suspense>.
+//          Zero logic changes — purely structural.
+// ─────────────────────────────────────────────────────────────────────────────
+export default function MenuPage() {
+  return (
+    <Suspense
+      fallback={
+        <div style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#0d0d0d',
+          flexDirection: 'column',
+          gap: 16,
+        }}>
+          <div style={{
+            width: 40, height: 40,
+            border: '3px solid rgba(197,168,128,0.15)',
+            borderTopColor: '#C5A880',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+          }} />
+          <span style={{ color: '#C5A880', fontFamily: 'Georgia, serif', fontSize: 14, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+            Loading Menu…
+          </span>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      }
+    >
+      <MenuPageInner />
+    </Suspense>
   )
 }
 
