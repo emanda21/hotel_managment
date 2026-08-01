@@ -3,6 +3,11 @@ import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { getMenuItems, placeOrder, type MenuItem as ApiMenuItem } from '../../services/api'
 
+// Force dynamic rendering — this page calls the FastAPI backend at runtime.
+// Without this, Vercel will try to pre-render /menu at build time and fail
+// because the external API is not reachable during the build phase.
+export const dynamic = 'force-dynamic'
+
 // ==========================================
 // CUSTOMIZATION CONFIGURATION
 // ==========================================

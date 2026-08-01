@@ -23,6 +23,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
+// Force dynamic rendering — KDS polls the FastAPI backend at runtime.
+// Prevents Vercel build-time pre-render failure when the backend is unreachable.
+export const dynamic = 'force-dynamic'
+
 import {
   clearKitchen,
   getKitchenOrders,
