@@ -50,6 +50,9 @@ export default function RecipesTab({ menuItems, inventory }: Props) {
   // Which accordion sections are expanded (show ingredient list)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
+  // Search bar state — client-side filter on menu item name
+  const [searchQuery, setSearchQuery] = useState('')
+
   // ---------------------------------------------------------------------------
   // Data fetch
   // ---------------------------------------------------------------------------
@@ -68,12 +71,14 @@ export default function RecipesTab({ menuItems, inventory }: Props) {
   useEffect(() => { fetchRecipes() }, [])
 
   // ---------------------------------------------------------------------------
-  // Group recipe lines by menu_item_id
+  // Group recipe lines by menu_item_id, then apply search filter
   // ---------------------------------------------------------------------------
-  const grouped = menuItems.map(item => ({
-    menuItem: item,
-    lines: recipes.filter(r => r.menu_item_id === item.id),
-  }))
+  const grouped = menuItems
+    .filter(item => item.name.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+    .map(item => ({
+      menuItem: item,
+      lines: recipes.filter(r => r.menu_item_id === item.id),
+    }))
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -154,13 +159,53 @@ export default function RecipesTab({ menuItems, inventory }: Props) {
       )}
 
       {/* Page heading */}
-      <div style={{ marginBottom:28 }}>
+      <div style={{ marginBottom: 20 }}>
         <h2 style={{ fontSize:20, fontWeight:700, fontFamily:'Lora,Georgia,serif', color:'white', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:6 }}>
           🧪 Recipe Management
         </h2>
         <p style={{ fontSize:11, color:'rgba(255,255,255,0.35)', letterSpacing:'0.04em' }}>
           Link menu items to their required store ingredients. Each line specifies how much of an ingredient is consumed per serving.
         </p>
+      </div>
+
+      {/* ── Search Bar ────────────────────────────────────────────── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: 8, padding: '10px 14px',
+        marginBottom: 20,
+        transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+      }}
+        onFocus={e => (e.currentTarget.style.borderColor = 'rgba(197,168,128,0.55)')}
+        onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)')}
+      >
+        <span style={{ fontSize: 14, opacity: 0.5, flexShrink: 0 }}>🔍</span>
+        <input
+          id="recipes-search-input"
+          type="text"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder="Search menu items by name…"
+          style={{
+            flex: 1, background: 'transparent', border: 'none', outline: 'none',
+            fontSize: 13, color: 'white',
+            fontFamily: "'Montserrat', system-ui, sans-serif",
+          }}
+          autoComplete="off"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            style={{ background: 'rgba(255,255,255,0.08)', border: 'none', color: 'rgba(255,255,255,0.45)', fontSize: 10, cursor: 'pointer', borderRadius: '50%', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+            aria-label="Clear search"
+          >✕</button>
+        )}
+        {searchQuery && (
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(197,168,128,0.7)', background: 'rgba(197,168,128,0.07)', border: '1px solid rgba(197,168,128,0.2)', borderRadius: 5, padding: '3px 9px', whiteSpace: 'nowrap' }}>
+            {grouped.length} result{grouped.length !== 1 ? 's' : ''}
+          </span>
+        )}
       </div>
 
       {loading ? (

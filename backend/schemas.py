@@ -30,6 +30,15 @@ class InventoryItemCreate(BaseModel):
     stock_level: float = Field(..., ge=0, description="Current available stock.", examples=[10.0])
     low_stock_threshold: float = Field(..., ge=0, description="Alert threshold for admin dashboard.", examples=[2.0])
     cost_per_unit: float = Field(..., ge=0, description="Purchase cost per unit (for financial reports).", examples=[8.50])
+    # Who added this ingredient — written to inventory_logs for audit trail.
+    added_by: Optional[str] = Field(None, min_length=1, max_length=100, description="Name of the person adding initial stock.", examples=["Ahmed"])
+
+
+class InventoryRestock(BaseModel):
+    """Request body for POST /inventory/{id}/restock."""
+
+    quantity: float = Field(..., gt=0, description="Amount of stock to add (must be > 0).", examples=[5.0])
+    added_by: str = Field(..., min_length=1, max_length=100, description="Name of the person restocking the item.", examples=["Ahmed"])
 
 
 class InventoryItemUpdate(BaseModel):
@@ -309,3 +318,50 @@ class MarkOrderServedResponse(BaseModel):
     deductions: list[StockDeduction] = []
     low_stock_alerts: list[LowStockAlert] = []
     message: str = "Order marked as served. Inventory deducted."
+
+
+# =============================================================================
+# Tourist Shop & Marketplace
+# =============================================================================
+
+SHOP_CATEGORIES = {
+    "Cultural Clothes",
+    "Souvenirs",
+    "Car Rental",
+    "Experiences",
+}
+
+
+class ShopItemCreate(BaseModel):
+    """Request body for creating a new shop item (POST /shop/)."""
+
+    name:        str            = Field(..., min_length=1, max_length=200)
+    description: Optional[str]  = Field(None, max_length=2000)
+    price:       float          = Field(..., ge=0)
+    category:    str            = Field(..., min_length=1, max_length=100)
+    image_url:   Optional[str]  = Field(None, max_length=1000)
+    is_active:   bool           = Field(True)
+
+
+class ShopItemUpdate(BaseModel):
+    """Request body for updating a shop item (PUT /shop/{id})."""
+
+    name:        Optional[str]   = Field(None, min_length=1, max_length=200)
+    description: Optional[str]   = Field(None, max_length=2000)
+    price:       Optional[float] = Field(None, ge=0)
+    category:    Optional[str]   = Field(None, min_length=1, max_length=100)
+    image_url:   Optional[str]   = Field(None, max_length=1000)
+    is_active:   Optional[bool]  = None
+
+
+class ShopItemResponse(BaseModel):
+    """Full shop item representation returned by the API."""
+
+    id:          str
+    name:        str
+    description: Optional[str] = None
+    price:       float
+    category:    str
+    image_url:   Optional[str] = None
+    is_active:   bool
+    created_at:  datetime

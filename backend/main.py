@@ -27,7 +27,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import get_supabase_client
-from routers import inventory, menu_items, orders, recipes, reports
+from routers import inventory, menu_items, orders, recipes, reports, shop
 
 # ---------------------------------------------------------------------------
 # Logging — makes low-stock alerts visible with a clear prefix
@@ -142,6 +142,7 @@ app.include_router(menu_items.router)
 app.include_router(orders.router)
 app.include_router(recipes.router)
 app.include_router(reports.router)
+app.include_router(shop.router)
 
 
 # =============================================================================

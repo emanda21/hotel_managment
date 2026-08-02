@@ -60,6 +60,7 @@ from database import (
 )
 from schemas import (
     ClearKitchenResponse,
+    DeleteResponse,
     InsufficientStockResponse,
     KITCHEN_STATUSES,
     KitchenStatusResponse,
@@ -429,8 +430,47 @@ def list_orders(
 
 
 # =============================================================================
-# PATCH /orders/{order_id}/kitchen-status
+# DELETE /orders/{order_id}
 # =============================================================================
+
+@router.delete(
+    "/orders/{order_id}",
+    response_model=DeleteResponse,
+    summary="Permanently delete an order (admin only — no date restriction)",
+    description=(
+        "Hard-deletes a single order row from the database regardless of its "
+        "creation date. Admins can use this to remove orders from any day, "
+        "not just today. Related ``inventory_logs`` rows are **not** deleted "
+        "so the audit trail remains intact."
+    ),
+    tags=["Orders"],
+)
+def delete_order(order_id: str, db: DB) -> DeleteResponse:
+    """
+    Permanently removes the specified order row.
+
+    - No date filter — works on orders from any day.
+    - Returns 404 if the order does not exist.
+    - Inventory audit logs referencing this order are preserved.
+    """
+    response = (
+        db.table("orders")
+        .delete()
+        .eq("id", order_id)
+        .execute()
+    )
+    if not response.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Order '{order_id}' not found.",
+        )
+    logger.info("Admin | order_id=%s permanently deleted", order_id)
+    return DeleteResponse(
+        message="Order deleted successfully.",
+        deleted_id=order_id,
+    )
+
+
 
 @router.patch(
     "/orders/{order_id}/kitchen-status",

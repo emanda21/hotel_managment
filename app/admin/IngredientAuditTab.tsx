@@ -72,6 +72,7 @@ const REASON_BADGE: Record<string, { bg: string; color: string; label: string }>
   ORDER_DEDUCTION:        { bg: 'rgba(239,68,68,0.1)',  color: '#fca5a5', label: 'Order (legacy)' },
   ORDER_SERVED_DEDUCTION: { bg: 'rgba(239,68,68,0.12)', color: '#fca5a5', label: 'Order Served' },
   MANUAL_RESTOCK:         { bg: 'rgba(74,222,128,0.1)', color: '#4ade80', label: 'Restock' },
+  INITIAL_STOCK:          { bg: 'rgba(74,222,128,0.1)', color: '#4ade80', label: 'Initial Stock' },
   WASTE_WRITE_OFF:        { bg: 'rgba(251,191,36,0.1)', color: '#fbbf24', label: 'Waste' },
 }
 
@@ -178,10 +179,15 @@ export default function IngredientAuditTab({
     )
   })
 
-  // ── summary metrics ───────────────────────────────────────────────────────
-  const totalEvents     = filtered.length
-  const totalDeductions = filtered.filter(l => l.change_amount < 0).length
-  const totalRestocks   = filtered.filter(l => l.change_amount > 0).length
+  // ── summary metrics — computed from the SAME filtered array the table shows ──
+  // This means: search + date + type filter ALL affect these numbers simultaneously.
+  const totalEvents       = filtered.length
+  const deductionRows     = filtered.filter(l => l.change_amount < 0)
+  const restockRows       = filtered.filter(l => l.change_amount > 0)
+  const totalDeductions   = deductionRows.length
+  const totalRestocks     = restockRows.length
+  const volDeducted       = deductionRows.reduce((s, l) => s + Math.abs(l.change_amount), 0)
+  const volRestocked      = restockRows.reduce((s, l) => s + l.change_amount, 0)
 
   // ── styles (inline — no extra CSS file needed) ───────────────────────────
   const sectionTitle: React.CSSProperties = {
@@ -273,27 +279,88 @@ export default function IngredientAuditTab({
         </div>
       )}
 
+      {/* ── Search-context badge (shows when a text search is active) ──── */}
+      {search.trim() && (
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          background: 'rgba(197,168,128,0.08)',
+          border: '1px solid rgba(197,168,128,0.25)',
+          borderRadius: 7, padding: '6px 14px', marginBottom: 14,
+        }}>
+          <span style={{ fontSize: 13 }}>🔎</span>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>
+            Stats filtered for:{' '}
+            <strong style={{ color: '#C5A880', fontWeight: 700 }}>&ldquo;{search.trim()}&rdquo;</strong>
+          </span>
+          <button
+            onClick={() => setSearch('')}
+            style={{ background: 'transparent', border: 'none', color: 'rgba(197,168,128,0.6)', fontSize: 12, cursor: 'pointer', padding: 0, marginLeft: 4 }}
+            title="Clear search"
+          >✕</button>
+        </div>
+      )}
+
       {/* ── Summary Cards ──────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
-        {[
-          { label: 'Total Events',  value: totalEvents,     color: '#C5A880' },
-          { label: 'Deductions',    value: totalDeductions, color: '#fca5a5' },
-          { label: 'Restocks',      value: totalRestocks,   color: '#4ade80' },
-        ].map(chip => (
-          <div key={chip.label} style={{
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 8, padding: '8px 18px',
-            display: 'flex', flexDirection: 'column', gap: 2,
+        {/* Total Events */}
+        <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 18px', display: 'flex', flexDirection: 'column', gap: 2, minWidth: 110 }}>
+          <span style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)' }}>
+            Total Events
+          </span>
+          <span style={{ fontSize: 26, fontWeight: 700, color: '#C5A880', fontFamily: 'Lora,Georgia,serif', lineHeight: 1.1 }}>
+            {totalEvents}
+          </span>
+        </div>
+
+        {/* Deductions */}
+        <div style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 8, padding: '10px 18px', display: 'flex', flexDirection: 'column', gap: 2, minWidth: 130 }}>
+          <span style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)' }}>
+            ▼ Deductions
+          </span>
+          <span style={{ fontSize: 26, fontWeight: 700, color: '#fca5a5', fontFamily: 'Lora,Georgia,serif', lineHeight: 1.1 }}>
+            {totalDeductions}
+          </span>
+          {volDeducted > 0 && (
+            <span style={{ fontSize: 10, color: 'rgba(252,165,165,0.6)', fontWeight: 600, marginTop: 1 }}>
+              −{Number(volDeducted.toFixed(3))} units total
+            </span>
+          )}
+        </div>
+
+        {/* Restocks */}
+        <div style={{ background: 'rgba(74,222,128,0.05)', border: '1px solid rgba(74,222,128,0.15)', borderRadius: 8, padding: '10px 18px', display: 'flex', flexDirection: 'column', gap: 2, minWidth: 130 }}>
+          <span style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)' }}>
+            ▲ Restocks
+          </span>
+          <span style={{ fontSize: 26, fontWeight: 700, color: '#4ade80', fontFamily: 'Lora,Georgia,serif', lineHeight: 1.1 }}>
+            {totalRestocks}
+          </span>
+          {volRestocked > 0 && (
+            <span style={{ fontSize: 10, color: 'rgba(74,222,128,0.6)', fontWeight: 600, marginTop: 1 }}>
+              +{Number(volRestocked.toFixed(3))} units total
+            </span>
+          )}
+        </div>
+
+        {/* Net Change — only show when both exist */}
+        {(volDeducted > 0 || volRestocked > 0) && (
+          <div style={{
+            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+            borderRadius: 8, padding: '10px 18px', display: 'flex', flexDirection: 'column', gap: 2, minWidth: 130,
           }}>
             <span style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)' }}>
-              {chip.label}
+              Net Change
             </span>
-            <span style={{ fontSize: 22, fontWeight: 700, color: chip.color, fontFamily: 'Lora,Georgia,serif' }}>
-              {chip.value}
+            <span style={{
+              fontSize: 26, fontWeight: 700,
+              color: volRestocked - volDeducted >= 0 ? '#4ade80' : '#fca5a5',
+              fontFamily: 'Lora,Georgia,serif', lineHeight: 1.1,
+            }}>
+              {volRestocked - volDeducted >= 0 ? '+' : ''}{Number((volRestocked - volDeducted).toFixed(3))}
             </span>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', fontWeight: 600, marginTop: 1 }}>units</span>
           </div>
-        ))}
+        )}
       </div>
 
       {/* ── Type Filter Tabs ───────────────────────────────────────────── */}
@@ -494,7 +561,14 @@ export default function IngredientAuditTab({
                         </td>
                       )}
                       <td style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
-                        {log.menu_item_name
+                        {/* For restock rows, show the Added By name */}
+                        {(log.reason === 'MANUAL_RESTOCK' || log.reason === 'INITIAL_STOCK')
+                          ? (
+                            log.added_by
+                              ? <span style={{ color: '#4ade80', fontWeight: 600 }}>Added by: {log.added_by}</span>
+                              : <span style={{ color: 'rgba(255,255,255,0.25)' }}>—</span>
+                          )
+                          : log.menu_item_name
                           ? <>
                               <span style={{ color: 'white', fontWeight: 600 }}>{log.menu_item_name}</span>
                               {log.order_quantity != null && (

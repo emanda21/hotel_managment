@@ -28,6 +28,7 @@ from schemas import (
     InventoryItemCreate,
     InventoryItemResponse,
     InventoryItemUpdate,
+    InventoryRestock,
 )
 
 router = APIRouter(prefix="/inventory", tags=["Store Inventory"])
@@ -185,13 +186,33 @@ def create_inventory_item(
     """
     Insert a new ingredient record.
     Returns the created row including its generated UUID and ``created_at``.
+
+    If ``body.added_by`` is provided, an INITIAL_STOCK audit row is written
+    to ``inventory_logs`` so the addition appears in the Activity Log.
     """
+    # Separate added_by before inserting — it's not a store_inventory column.
+    added_by = body.added_by
+    insert_data = body.model_dump(exclude={"added_by"})
+
     response = (
         db.table("store_inventory")
-        .insert(body.model_dump())
+        .insert(insert_data)
         .execute()
     )
-    return InventoryItemResponse.from_row(response.data[0])
+    created = response.data[0]
+
+    # Write an audit log entry so the addition shows in the Activity Log.
+    if body.stock_level and body.stock_level > 0:
+        log_payload: dict = {
+            "inventory_id":  created["id"],
+            "change_amount": body.stock_level,
+            "reason":        "MANUAL_RESTOCK",
+        }
+        if added_by:
+            log_payload["added_by"] = added_by
+        db.table("inventory_logs").insert(log_payload).execute()
+
+    return InventoryItemResponse.from_row(created)
 
 
 # ---------------------------------------------------------------------------
@@ -232,6 +253,77 @@ def update_inventory_item(
             detail=f"Inventory item '{item_id}' not found.",
         )
     return InventoryItemResponse.from_row(response.data[0])
+
+
+
+# ---------------------------------------------------------------------------
+# POST /inventory/{id}/restock
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/{item_id}/restock",
+    response_model=InventoryItemResponse,
+    summary="Restock an inventory item (adds stock + writes audit log)",
+)
+def restock_inventory_item(
+    item_id: str,
+    body: InventoryRestock,
+    db: DB,
+) -> InventoryItemResponse:
+    """
+    Add stock to an existing ingredient and write a ``MANUAL_RESTOCK`` audit row.
+
+    Steps
+    -----
+    1. Fetch the current ``stock_level`` for the ingredient.
+    2. Compute ``new_level = stock_level + body.quantity``.
+    3. UPDATE ``store_inventory`` with the new level.
+    4. INSERT a row into ``inventory_logs`` with:
+       - ``change_amount = +body.quantity``
+       - ``reason = 'MANUAL_RESTOCK'``
+       - ``added_by = body.added_by``
+
+    The new log row will appear in the Activity Log immediately.
+    """
+    # 1. Fetch current item
+    fetch_resp = (
+        db.table("store_inventory")
+        .select("*")
+        .eq("id", item_id)
+        .maybe_single()
+        .execute()
+    )
+    if not fetch_resp.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Inventory item '{item_id}' not found.",
+        )
+    current = fetch_resp.data
+    new_level = round(float(current["stock_level"]) + body.quantity, 4)
+
+    # 2. Update stock level
+    update_resp = (
+        db.table("store_inventory")
+        .update({"stock_level": new_level})
+        .eq("id", item_id)
+        .execute()
+    )
+    if not update_resp.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update stock level.",
+        )
+
+    # 3. Write audit log
+    log_payload: dict = {
+        "inventory_id":  item_id,
+        "change_amount": body.quantity,
+        "reason":        "MANUAL_RESTOCK",
+        "added_by":      body.added_by,
+    }
+    db.table("inventory_logs").insert(log_payload).execute()
+
+    return InventoryItemResponse.from_row(update_resp.data[0])
 
 
 # ---------------------------------------------------------------------------

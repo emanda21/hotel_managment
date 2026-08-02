@@ -11,6 +11,8 @@ import {
   createInventoryItem,
   updateInventoryItem,
   deleteInventoryItem,
+  restockInventoryItem,
+  deleteOrder,
   type MenuItem,
   type InventoryItem,
   type MenuItemCreate,
@@ -45,10 +47,11 @@ type InvFormState = {
   stock_level:         string
   low_stock_threshold: string
   cost_per_unit:       string
+  added_by:            string   // Required for new items, optional for edits
 }
 
 const EMPTY_INV_FORM: InvFormState = {
-  name: '', unit: 'KG', stock_level: '', low_stock_threshold: '', cost_per_unit: '',
+  name: '', unit: 'KG', stock_level: '', low_stock_threshold: '', cost_per_unit: '', added_by: '',
 }
 
 const MAX_SIZE_MB = 2
@@ -165,9 +168,20 @@ export default function AdminPage() {
 
   // ── Inventory filter state (client-side only — no extra API calls) ─────────
   const [invSearch, setInvSearch]           = useState('')
-  const [invStockFilter, setInvStockFilter] = useState<'all' | 'low' | 'under50' | 'over50'>('all')
+  const [invStockFilter, setInvStockFilter] = useState<'all' | 'low'>('all')
   const [invFromDate, setInvFromDate]       = useState('')   // YYYY-MM-DD
   const [invToDate,   setInvToDate]         = useState('')   // YYYY-MM-DD
+
+  // ── Menu Items filter state ───────────────────────────────────────────────
+  const [menuSearch,     setMenuSearch]     = useState('')
+  const [menuCatFilter,  setMenuCatFilter]  = useState('ALL')
+
+  // ── Restock modal state ────────────────────────────────────────
+  const [restockItem,     setRestockItem]     = useState<InventoryItem | null>(null)
+  const [restockQty,      setRestockQty]      = useState('')
+  const [restockAddedBy,  setRestockAddedBy]  = useState('')
+  const [restockSaving,   setRestockSaving]   = useState(false)
+  const [restockMsg,      setRestockMsg]      = useState('')
 
   // ── Orders (Live Kitchen Dashboard) state ─────────────────
   const [orders, setOrders]               = useState<OrderRecord[]>([])
@@ -312,12 +326,15 @@ export default function AdminPage() {
       stock_level:         String(item.stock_level),
       low_stock_threshold: String(item.low_stock_threshold),
       cost_per_unit:       String(item.cost_per_unit),
+      added_by:            '',   // Don't pre-fill on edit
     })
     setEditingInvId(item.id); setShowInvForm(true)
   }
 
   async function saveInventoryItem() {
     if (!invForm.name.trim()) { setInvMsg('Name is required.'); return }
+    // Require Added By only when creating a new item
+    if (!editingInvId && !invForm.added_by.trim()) { setInvMsg('"Added By" name is required.'); return }
 
     // Parse strings to floats here — the only place numbers are needed.
     const stockLevel    = parseFloat(invForm.stock_level)
@@ -335,10 +352,11 @@ export default function AdminPage() {
       stock_level:         stockLevel,
       low_stock_threshold: threshold,
       cost_per_unit:       costPerUnit,
+      added_by:            invForm.added_by.trim() || undefined,
     }
     try {
       if (editingInvId) { await updateInventoryItem(editingInvId, payload); setInvMsg('Ingredient updated!') }
-      else              { await createInventoryItem(payload); setInvMsg('Ingredient added!') }
+      else              { await createInventoryItem(payload); setInvMsg('Ingredient added to inventory and activity log!') }
       cancelInvForm(); fetchInventory()
     } catch {
       setInvMsg('Error saving ingredient. Please check the API server.')
@@ -350,6 +368,40 @@ export default function AdminPage() {
     try {
       await deleteInventoryItem(id); setInvMsg('Ingredient deleted.'); fetchInventory()
     } catch { setInvMsg('Error deleting ingredient.') }
+  }
+
+  // ============================================================
+  //  RESTOCK
+  // ============================================================
+  async function handleRestock() {
+    if (!restockItem) return
+    const qty = parseFloat(restockQty)
+    if (isNaN(qty) || qty <= 0) { setRestockMsg('Quantity must be a number greater than 0.'); return }
+    if (!restockAddedBy.trim())  { setRestockMsg('"Added By" name is required.'); return }
+
+    setRestockSaving(true); setRestockMsg('')
+    try {
+      await restockInventoryItem(restockItem.id, qty, restockAddedBy.trim())
+      setInvMsg(`✅ ${restockItem.name} restocked (+${qty} ${restockItem.unit}) by ${restockAddedBy.trim()}. Activity log updated.`)
+      setRestockItem(null); setRestockQty(''); setRestockAddedBy('')
+      fetchInventory()
+    } catch {
+      setRestockMsg('Error restocking. Please check the API server.')
+    } finally { setRestockSaving(false) }
+  }
+
+  // ============================================================
+  //  ORDERS — delete
+  // ============================================================
+  async function handleDeleteOrder(orderId: string, itemName: string) {
+    if (!confirm(`Permanently delete order for "${itemName}"?\n\nThis cannot be undone. Audit logs are preserved.`)) return
+    try {
+      await deleteOrder(orderId)
+      fetchOrders()
+    } catch {
+      // Just re-fetch; the order may have already been cleared
+      fetchOrders()
+    }
   }
 
   // ============================================================
@@ -376,15 +428,29 @@ export default function AdminPage() {
     .map(cat => ({ category: cat, items: items.filter(i => i.category === cat) }))
     .filter(g => g.items.length > 0)
 
+  // Unique categories that actually have items, for the filter pill row
+  const availableCategories = ['ALL', ...CATEGORIES.filter(cat => items.some(i => i.category === cat))]
+
+  // Derived list — respects search bar AND category pill
+  const displayedGroups = groupedByCategory
+    .filter(g => menuCatFilter === 'ALL' || g.category === menuCatFilter)
+    .map(g => ({
+      ...g,
+      items: g.items.filter(i =>
+        !menuSearch.trim() ||
+        i.name.toLowerCase().includes(menuSearch.trim().toLowerCase()) ||
+        (i.description ?? '').toLowerCase().includes(menuSearch.trim().toLowerCase())
+      ),
+    }))
+    .filter(g => g.items.length > 0)
+
   const lowStockCount = inventory.filter(i => i.is_low_stock).length
 
   // Derived filtered inventory — updates instantly as the user types / clicks
   const displayedInventory = inventory
     .filter(i => i.name.toLowerCase().includes(invSearch.trim().toLowerCase()))
     .filter(i => {
-      if (invStockFilter === 'low')     return i.is_low_stock
-      if (invStockFilter === 'under50') return i.stock_level < (i.low_stock_threshold * 0.5)
-      if (invStockFilter === 'over50')  return i.stock_level >= (i.low_stock_threshold * 0.5)
+      if (invStockFilter === 'low') return i.is_low_stock
       return true
     })
     .filter(i => {
@@ -524,46 +590,138 @@ export default function AdminPage() {
                 <button className="premium-add-btn mx-auto" onClick={startAddMenu}>+ Add First Item</button>
               </div>
             ) : (
-              <div className="space-y-14">
-                {groupedByCategory.map(group => (
-                  <div key={group.category} className="category-group-section animate-fadeIn">
-                    <div className="flex items-center gap-4 mb-6">
-                      <h2 className="category-header-title premium-font-serif">{group.category}</h2>
-                      <div className="flex-1 h-px bg-gradient-to-r from-[#C5A880]/30 via-[#C5A880]/5 to-transparent" />
-                      <span className="text-[10px] text-stone-500 font-semibold uppercase tracking-widest">
-                        {group.items.length} item{group.items.length !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {group.items.map(item => (
-                        <div key={item.id} className="premium-admin-card">
-                          {item.image_url
-                            ? <div className="card-image-wrapper"><img src={item.image_url} alt={item.name} className="card-image" /></div>
-                            : <div className="card-image-placeholder">🍽️</div>
-                          }
-                          <div className="card-info">
-                            <h3 className="card-name premium-font-serif">{item.name}</h3>
-                            <p className="card-desc">{item.description || 'No description.'}</p>
-                            <div className="card-price-row">
-                              <span className="price-tag">Br {item.price}</span>
-                            </div>
-                          </div>
-                          <div className="card-actions">
-                            <button className="action-btn-edit" onClick={() => startEditMenu(item)}>Edit</button>
-                            <button className="action-btn-delete" onClick={() => handleDeleteMenuItem(item.id)}>Delete</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+              <>
+                {/* ── Search Bar ──────────────────────────────────────────────── */}
+                <div
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 8, padding: '10px 14px', marginBottom: 14,
+                    transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+                  }}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'rgba(197,168,128,0.55)')}
+                  onBlur={e  => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)')}
+                >
+                  <span style={{ fontSize: 14, opacity: 0.5, flexShrink: 0 }}>🔍</span>
+                  <input
+                    id="menu-search-input"
+                    type="text"
+                    value={menuSearch}
+                    onChange={e => setMenuSearch(e.target.value)}
+                    placeholder="Search by name or description…"
+                    style={{
+                      flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                      fontSize: 13, color: 'white',
+                      fontFamily: "'Montserrat', system-ui, sans-serif",
+                    }}
+                    autoComplete="off"
+                  />
+                  {(menuSearch || menuCatFilter !== 'ALL') && (
+                    <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(197,168,128,0.7)', background: 'rgba(197,168,128,0.07)', border: '1px solid rgba(197,168,128,0.2)', borderRadius: 5, padding: '3px 9px', whiteSpace: 'nowrap' }}>
+                      {displayedGroups.reduce((a, g) => a + g.items.length, 0)} result{displayedGroups.reduce((a, g) => a + g.items.length, 0) !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                  {menuSearch && (
+                    <button
+                      onClick={() => setMenuSearch('')}
+                      aria-label="Clear search"
+                      style={{ background: 'rgba(255,255,255,0.08)', border: 'none', color: 'rgba(255,255,255,0.45)', fontSize: 10, cursor: 'pointer', borderRadius: '50%', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                    >✕</button>
+                  )}
+                </div>
+
+                {/* ── Category Filter Pills ────────────────────────────────────── */}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 28 }}>
+                  {availableCategories.map(cat => (
+                    <button
+                      key={cat}
+                      id={`menu-cat-${cat.toLowerCase().replace(/\s+/g, '-')}`}
+                      onClick={() => setMenuCatFilter(cat)}
+                      style={{
+                        padding: '6px 16px',
+                        fontSize: 10, fontWeight: 700,
+                        textTransform: 'uppercase', letterSpacing: '0.08em',
+                        borderRadius: 20,
+                        border: menuCatFilter === cat
+                          ? '1px solid rgba(197,168,128,0.6)'
+                          : '1px solid rgba(255,255,255,0.1)',
+                        background: menuCatFilter === cat
+                          ? 'rgba(197,168,128,0.15)'
+                          : 'transparent',
+                        color: menuCatFilter === cat
+                          ? '#C5A880'
+                          : 'rgba(255,255,255,0.4)',
+                        cursor: 'pointer',
+                        transition: 'all 0.18s ease',
+                        boxShadow: menuCatFilter === cat
+                          ? '0 0 0 1px rgba(197,168,128,0.1)'
+                          : 'none',
+                      }}
+                    >
+                      {cat === 'ALL' ? 'All Items' : cat}
+                    </button>
+                  ))}
+                </div>
+
+                {/* ── Cards grid or no-results ─────────────────────────────────── */}
+                {displayedGroups.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '60px 0', border: '1px dashed rgba(197,168,128,0.2)', borderRadius: 16, background: 'rgba(255,255,255,0.015)' }}>
+                    <span style={{ fontSize: 36, display: 'block', marginBottom: 12 }}>🍽️</span>
+                    <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginBottom: 16 }}>
+                      No menu items match your current filters.
+                    </p>
+                    <button
+                      style={{ background: 'transparent', border: '1px solid rgba(197,168,128,0.35)', color: '#C5A880', borderRadius: 6, padding: '7px 18px', fontSize: 10, fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em' }}
+                      onClick={() => { setMenuSearch(''); setMenuCatFilter('ALL') }}
+                    >
+                      Clear Filters
+                    </button>
                   </div>
-                ))}
-              </div>
+                ) : (
+                  <div className="space-y-14">
+                    {displayedGroups.map(group => (
+                      <div key={group.category} className="category-group-section animate-fadeIn">
+                        <div className="flex items-center gap-4 mb-6">
+                          <h2 className="category-header-title premium-font-serif">{group.category}</h2>
+                          <div className="flex-1 h-px bg-gradient-to-r from-[#C5A880]/30 via-[#C5A880]/5 to-transparent" />
+                          <span className="text-[10px] text-stone-500 font-semibold uppercase tracking-widest">
+                            {group.items.length} item{group.items.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {group.items.map(item => (
+                            <div key={item.id} className="premium-admin-card">
+                              {item.image_url
+                                ? <div className="card-image-wrapper"><img src={item.image_url} alt={item.name} className="card-image" /></div>
+                                : <div className="card-image-placeholder">🍽️</div>
+                              }
+                              <div className="card-info">
+                                <h3 className="card-name premium-font-serif">{item.name}</h3>
+                                <p className="card-desc">{item.description || 'No description.'}</p>
+                                <div className="card-price-row">
+                                  <span className="price-tag">Br {item.price}</span>
+                                </div>
+                              </div>
+                              <div className="card-actions">
+                                <button className="action-btn-edit" onClick={() => startEditMenu(item)}>Edit</button>
+                                <button className="action-btn-delete" onClick={() => handleDeleteMenuItem(item.id)}>Delete</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
 
         {/* ================================================================
             TAB: STORE INVENTORY
+
         ================================================================ */}
         {activeTab === 'inventory' && (
           <>
@@ -633,13 +791,11 @@ export default function AdminPage() {
 
                   {/* Quick-filter pill row */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>Filter:</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.45)', flexShrink: 0 }}>Inventory Status:</span>
                     <div className="inv-filter-bar">
                       {([
-                        { key: 'all',     label: 'All' },
-                        { key: 'low',     label: '⚠ Low Stock' },
-                        { key: 'under50', label: '< 50%' },
-                        { key: 'over50',  label: '> 50%' },
+                        { key: 'all', label: 'ALL' },
+                        { key: 'low', label: '⚠ Low Stock' },
                       ] as const).map(f => (
                         <button
                           key={f.key}
@@ -743,6 +899,10 @@ export default function AdminPage() {
                             <td>
                               <div style={{ display: 'flex', gap: 6 }}>
                                 <button className="action-btn-edit" onClick={() => startEditInv(item)}>Edit</button>
+                                <button
+                                  style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', padding: '6px 10px', border: '1px solid rgba(74,222,128,0.4)', background: 'transparent', color: '#4ade80', borderRadius: 4, cursor: 'pointer', transition: 'all 0.2s ease', whiteSpace: 'nowrap' }}
+                                  onClick={() => { setRestockItem(item); setRestockQty(''); setRestockAddedBy(''); setRestockMsg('') }}
+                                >+Stock</button>
                                 <button className="action-btn-delete" onClick={() => handleDeleteInventory(item.id)}>Del</button>
                               </div>
                             </td>
@@ -973,6 +1133,31 @@ export default function AdminPage() {
                           <span className="order-detail-value order-total">Br {total.toLocaleString()}</span>
                         </div>
                       </div>
+
+                      {/* Admin Delete Button */}
+                      <button
+                        id={`delete-order-${order.id}`}
+                        onClick={() => handleDeleteOrder(order.id, itemName)}
+                        style={{
+                          marginTop: 14,
+                          width: '100%',
+                          padding: '7px 0',
+                          background: 'transparent',
+                          border: '1px solid rgba(239,68,68,0.3)',
+                          borderRadius: 6,
+                          color: 'rgba(239,68,68,0.7)',
+                          fontSize: 10,
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.08em',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                        }}
+                        onMouseEnter={e => { (e.target as HTMLButtonElement).style.background = 'rgba(239,68,68,0.1)'; (e.target as HTMLButtonElement).style.borderColor = '#ef4444'; (e.target as HTMLButtonElement).style.color = '#ef4444' }}
+                        onMouseLeave={e => { (e.target as HTMLButtonElement).style.background = 'transparent'; (e.target as HTMLButtonElement).style.borderColor = 'rgba(239,68,68,0.3)'; (e.target as HTMLButtonElement).style.color = 'rgba(239,68,68,0.7)' }}
+                      >
+                        🗑 Delete Order
+                      </button>
                     </div>
                   )
                 })}
@@ -1147,10 +1332,108 @@ export default function AdminPage() {
                   placeholder="e.g. 8.50"
                 />
               </div>
+
+              {/* Added By — required for new items, hidden on edit */}
+              {!editingInvId && (
+                <div className="form-group">
+                  <label className="form-label" style={{ color: '#C5A880' }}>
+                    Added By <span style={{ color: '#fca5a5', fontWeight: 800 }}>*</span>
+                  </label>
+                  <input
+                    className="form-input"
+                    value={invForm.added_by}
+                    onChange={e => setInvForm({ ...invForm, added_by: e.target.value })}
+                    placeholder="Your name (recorded in Activity Log)"
+                  />
+                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
+                    This will appear in the Activity Log under Restocks.
+                  </span>
+                </div>
+              )}
+
               <div className="modal-footer-actions">
                 <button className="modal-btn-cancel" onClick={cancelInvForm}>Cancel</button>
                 <button className="modal-btn-save" onClick={saveInventoryItem} disabled={invSaving}>
                   {invSaving ? 'Processing…' : editingInvId ? 'Save Changes' : 'Add Ingredient'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================
+          MODAL: RESTOCK INGREDIENT
+      ================================================================ */}
+      {restockItem && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="premium-form-modal w-full max-w-sm">
+            <div className="modal-header-row">
+              <h2 className="modal-header-title premium-font-serif">
+                ▲ Restock Ingredient
+              </h2>
+              <button className="modal-close-btn" onClick={() => { setRestockItem(null); setRestockMsg('') }}>✕</button>
+            </div>
+            <div className="modal-body-form">
+
+              {/* Item name banner */}
+              <div style={{ background: 'rgba(74,222,128,0.07)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 8, padding: '10px 14px' }}>
+                <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(74,222,128,0.8)', marginBottom: 4 }}>Adding Stock To</p>
+                <p style={{ fontSize: 15, fontWeight: 700, color: 'white', fontFamily: 'Lora,Georgia,serif' }}>{restockItem.name}</p>
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+                  Current: <strong style={{ color: '#4ade80' }}>{restockItem.stock_level} {restockItem.unit}</strong>
+                </p>
+              </div>
+
+              {/* Error message */}
+              {restockMsg && (
+                <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, padding: '10px 14px', fontSize: 12, color: '#fca5a5' }}>
+                  {restockMsg}
+                </div>
+              )}
+
+              {/* Quantity */}
+              <div className="form-group">
+                <label className="form-label">Quantity to Add ({restockItem.unit})</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  className="form-input"
+                  value={restockQty}
+                  onChange={e => setRestockQty(e.target.value)}
+                  placeholder={`e.g. 5.0 ${restockItem.unit}`}
+                  autoFocus
+                />
+                {restockQty && !isNaN(parseFloat(restockQty)) && parseFloat(restockQty) > 0 && (
+                  <span style={{ fontSize: 10, color: '#4ade80', marginTop: 2 }}>
+                    New total: {(restockItem.stock_level + parseFloat(restockQty)).toFixed(4)} {restockItem.unit}
+                  </span>
+                )}
+              </div>
+
+              {/* Added By */}
+              <div className="form-group">
+                <label className="form-label" style={{ color: '#C5A880' }}>
+                  Added By <span style={{ color: '#fca5a5', fontWeight: 800 }}>*</span>
+                </label>
+                <input
+                  className="form-input"
+                  value={restockAddedBy}
+                  onChange={e => setRestockAddedBy(e.target.value)}
+                  placeholder="Your name (recorded in Activity Log)"
+                />
+              </div>
+
+              <div className="modal-footer-actions">
+                <button className="modal-btn-cancel" onClick={() => { setRestockItem(null); setRestockMsg('') }}>Cancel</button>
+                <button
+                  className="modal-btn-save"
+                  style={{ background: '#4ade80', color: '#0a0a0a' }}
+                  onClick={handleRestock}
+                  disabled={restockSaving}
+                >
+                  {restockSaving ? 'Saving…' : '▲ Confirm Restock'}
                 </button>
               </div>
             </div>

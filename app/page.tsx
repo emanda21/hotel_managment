@@ -51,6 +51,7 @@ export default function LandingPage() {
               { label: 'Home',         href: '#home' },
               { label: 'Menu',         href: '/menu' },
               { label: 'Room Service', href: '/rooms' },
+              { label: 'Shop',         href: '/shop' },
               { label: 'About',        href: '#about' },
               { label: 'Contact',      href: '#contact' },
               { label: 'Kitchen',      href: '/kitchen' },

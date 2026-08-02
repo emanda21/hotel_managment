@@ -134,6 +134,22 @@ export async function deleteInventoryItem(id: string): Promise<void> {
   await api.delete(`/inventory/${id}`)
 }
 
+/**
+ * POST /inventory/{id}/restock — Add stock to an existing item and write
+ * a MANUAL_RESTOCK audit log entry with the name of the person restocking.
+ */
+export async function restockInventoryItem(
+  id: string,
+  quantity: number,
+  addedBy: string,
+): Promise<InventoryItem> {
+  const { data } = await api.post<InventoryItem>(`/inventory/${id}/restock`, {
+    quantity,
+    added_by: addedBy,
+  })
+  return data
+}
+
 // ---------------------------------------------------------------------------
 // menu_items
 // ---------------------------------------------------------------------------
@@ -239,6 +255,14 @@ export async function getOrders(limit = 100, skip = 0): Promise<OrderRecord[]> {
     params: { limit, skip },
   })
   return data
+}
+
+/**
+ * DELETE /orders/{id} — Permanently delete an order (no date restriction).
+ * Admins can remove orders from any date.
+ */
+export async function deleteOrder(orderId: string): Promise<void> {
+  await api.delete(`/orders/${orderId}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -381,6 +405,8 @@ export type InventoryLog = {
   order_id: string | null
   menu_item_name: string | null
   order_quantity: number | null
+  /** Name of the person who added or restocked this item (MANUAL_RESTOCK rows only) */
+  added_by: string | null
 }
 
 export interface AuditParams {
@@ -407,3 +433,32 @@ export async function getIngredientAudit({
   return data
 }
 
+
+// ---------------------------------------------------------------------------
+// Tourist Shop & Marketplace
+// ---------------------------------------------------------------------------
+
+export type ShopItem = {
+  id:          string
+  name:        string
+  description: string | null
+  price:       number
+  category:    string
+  image_url:   string | null
+  is_active:   boolean
+  created_at:  string
+}
+
+/** GET /shop/ — returns all active shop items, optionally filtered by category */
+export async function getShopItems(category?: string): Promise<ShopItem[]> {
+  const params: Record<string, string> = {}
+  if (category) params.category = category
+  const { data } = await api.get<ShopItem[]>('/shop/', { params })
+  return data
+}
+
+/** GET /shop/categories — returns all distinct category names */
+export async function getShopCategories(): Promise<string[]> {
+  const { data } = await api.get<string[]>('/shop/categories')
+  return data
+}
