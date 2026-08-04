@@ -45,6 +45,8 @@ export type MenuItem = {
   price: number
   category: string
   image_url: string | null
+  /** When false: item is dimmed on customer menu and cannot be added to cart. */
+  is_available: boolean
   created_at: string
 }
 
@@ -54,6 +56,7 @@ export type MenuItemCreate = {
   price: number
   category: string
   image_url?: string | null
+  is_available?: boolean
 }
 
 export type StockDeduction = {
@@ -150,6 +153,24 @@ export async function restockInventoryItem(
   return data
 }
 
+/**
+ * POST /inventory/{id}/deduct — Manually deduct stock from an existing item
+ * and write a MANUAL_DEDUCTION audit log entry.
+ */
+export async function deductInventoryItem(
+  id: string,
+  quantity: number,
+  deductedBy: string,
+  reason: string,
+): Promise<InventoryItem> {
+  const { data } = await api.post<InventoryItem>(`/inventory/${id}/deduct`, {
+    quantity,
+    deducted_by: deductedBy,
+    reason,
+  })
+  return data
+}
+
 // ---------------------------------------------------------------------------
 // menu_items
 // ---------------------------------------------------------------------------
@@ -182,6 +203,20 @@ export async function updateMenuItem(
   payload: Partial<MenuItemCreate>
 ): Promise<MenuItem> {
   const { data } = await api.put<MenuItem>(`/menu-items/${id}`, payload)
+  return data
+}
+
+/**
+ * PATCH /menu-items/{id} — Toggle the availability of a menu item.
+ * Admin-only: sets is_available = true | false.
+ */
+export async function toggleMenuItemAvailability(
+  id: string,
+  isAvailable: boolean,
+): Promise<MenuItem> {
+  const { data } = await api.put<MenuItem>(`/menu-items/${id}`, {
+    is_available: isAvailable,
+  })
   return data
 }
 
@@ -407,6 +442,8 @@ export type InventoryLog = {
   order_quantity: number | null
   /** Name of the person who added or restocked this item (MANUAL_RESTOCK rows only) */
   added_by: string | null
+  /** Name of the person who performed a manual deduction (MANUAL_DEDUCTION rows only) */
+  deducted_by: string | null
 }
 
 export interface AuditParams {

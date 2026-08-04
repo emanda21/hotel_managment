@@ -25,6 +25,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from database import get_db
 from schemas import (
     DeleteResponse,
+    InventoryDeduction,
     InventoryItemCreate,
     InventoryItemResponse,
     InventoryItemUpdate,
@@ -324,6 +325,91 @@ def restock_inventory_item(
     db.table("inventory_logs").insert(log_payload).execute()
 
     return InventoryItemResponse.from_row(update_resp.data[0])
+
+
+# ---------------------------------------------------------------------------
+# POST /inventory/{id}/deduct
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/{item_id}/deduct",
+    response_model=InventoryItemResponse,
+    summary="Manually deduct stock from an inventory item (writes audit log)",
+)
+def deduct_inventory_item(
+    item_id: str,
+    body: InventoryDeduction,
+    db: DB,
+) -> InventoryItemResponse:
+    """
+    Manually remove stock from an ingredient and write a ``MANUAL_DEDUCTION`` audit row.
+
+    Steps
+    -----
+    1. Fetch the current ``stock_level`` for the ingredient.
+    2. Validate that sufficient stock exists (cannot go below zero).
+    3. Compute ``new_level = stock_level - body.quantity``.
+    4. UPDATE ``store_inventory`` with the new level.
+    5. INSERT a row into ``inventory_logs`` with:
+       - ``change_amount = -body.quantity``  (negative = deduction)
+       - ``reason = body.reason``
+       - ``deducted_by = body.deducted_by``
+
+    The new log row will appear in the Activity Log immediately.
+    """
+    # 1. Fetch current item
+    fetch_resp = (
+        db.table("store_inventory")
+        .select("*")
+        .eq("id", item_id)
+        .maybe_single()
+        .execute()
+    )
+    if not fetch_resp.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Inventory item '{item_id}' not found.",
+        )
+    current = fetch_resp.data
+    current_stock = float(current["stock_level"])
+
+    # 2. Validate sufficient stock
+    if body.quantity > current_stock:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Cannot deduct {body.quantity} {current['unit']} from '{current['name']}'. "
+                f"Current stock is only {current_stock} {current['unit']}."
+            ),
+        )
+
+    new_level = round(current_stock - body.quantity, 4)
+
+    # 3. Update stock level
+    update_resp = (
+        db.table("store_inventory")
+        .update({"stock_level": new_level})
+        .eq("id", item_id)
+        .execute()
+    )
+    if not update_resp.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update stock level.",
+        )
+
+    # 4. Write audit log (negative change_amount = deduction)
+    log_payload: dict = {
+        "inventory_id":  item_id,
+        "change_amount": -body.quantity,      # negative so audit shows it as a deduction
+        "reason":        "MANUAL_DEDUCTION",
+        "deducted_by":   body.deducted_by,
+        "added_by":      None,                # not a restock; keep added_by NULL
+    }
+    db.table("inventory_logs").insert(log_payload).execute()
+
+    return InventoryItemResponse.from_row(update_resp.data[0])
+
 
 
 # ---------------------------------------------------------------------------

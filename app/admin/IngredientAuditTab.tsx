@@ -31,8 +31,8 @@ interface Props {
 type QuickFilter  = 'today' | 'week' | 'month' | 'all'
 type TypeFilter   = 'all' | 'deductions' | 'restocks'
 
-// Reason codes that count as an "order deduction"
-const DEDUCTION_REASONS = ['ORDER_DEDUCTION', 'ORDER_SERVED_DEDUCTION']
+// Reason codes that count as a "deduction" (shown in Ingredient Audit tab)
+const DEDUCTION_REASONS = ['ORDER_DEDUCTION', 'ORDER_SERVED_DEDUCTION', 'MANUAL_DEDUCTION']
 
 // --------------------------------------------------------------------------
 // helpers
@@ -69,11 +69,12 @@ function fmtAmount(amount: number, unit: string) {
 // Badge map — catches unknown reason codes gracefully
 // --------------------------------------------------------------------------
 const REASON_BADGE: Record<string, { bg: string; color: string; label: string }> = {
-  ORDER_DEDUCTION:        { bg: 'rgba(239,68,68,0.1)',  color: '#fca5a5', label: 'Order (legacy)' },
-  ORDER_SERVED_DEDUCTION: { bg: 'rgba(239,68,68,0.12)', color: '#fca5a5', label: 'Order Served' },
-  MANUAL_RESTOCK:         { bg: 'rgba(74,222,128,0.1)', color: '#4ade80', label: 'Restock' },
-  INITIAL_STOCK:          { bg: 'rgba(74,222,128,0.1)', color: '#4ade80', label: 'Initial Stock' },
-  WASTE_WRITE_OFF:        { bg: 'rgba(251,191,36,0.1)', color: '#fbbf24', label: 'Waste' },
+  ORDER_DEDUCTION:        { bg: 'rgba(239,68,68,0.1)',   color: '#fca5a5', label: 'Order (legacy)' },
+  ORDER_SERVED_DEDUCTION: { bg: 'rgba(239,68,68,0.12)',  color: '#fca5a5', label: 'Order Served' },
+  MANUAL_DEDUCTION:       { bg: 'rgba(251,113,133,0.15)', color: '#fb7185', label: 'Manual Deduction' },
+  MANUAL_RESTOCK:         { bg: 'rgba(74,222,128,0.1)',  color: '#4ade80', label: 'Restock' },
+  INITIAL_STOCK:          { bg: 'rgba(74,222,128,0.1)',  color: '#4ade80', label: 'Initial Stock' },
+  WASTE_WRITE_OFF:        { bg: 'rgba(251,191,36,0.1)',  color: '#fbbf24', label: 'Waste' },
 }
 
 const PAGE = 500
@@ -561,14 +562,24 @@ export default function IngredientAuditTab({
                         </td>
                       )}
                       <td style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
-                        {/* For restock rows, show the Added By name */}
+                        {/* MANUAL_RESTOCK / INITIAL_STOCK → show Added By */}
                         {(log.reason === 'MANUAL_RESTOCK' || log.reason === 'INITIAL_STOCK')
                           ? (
                             log.added_by
                               ? <span style={{ color: '#4ade80', fontWeight: 600 }}>Added by: {log.added_by}</span>
                               : <span style={{ color: 'rgba(255,255,255,0.25)' }}>—</span>
                           )
-                          : log.menu_item_name
+                        /* MANUAL_DEDUCTION → show Deducted By + Reason */
+                        : log.reason === 'MANUAL_DEDUCTION'
+                          ? (
+                            <span>
+                              <span style={{ color: '#fb7185', fontWeight: 600 }}>
+                                {log.deducted_by ? `Deducted by: ${log.deducted_by}` : 'Manual Deduction'}
+                              </span>
+                            </span>
+                          )
+                        /* Order-linked deductions → show menu item name */
+                        : log.menu_item_name
                           ? <>
                               <span style={{ color: 'white', fontWeight: 600 }}>{log.menu_item_name}</span>
                               {log.order_quantity != null && (

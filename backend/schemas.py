@@ -41,6 +41,20 @@ class InventoryRestock(BaseModel):
     added_by: str = Field(..., min_length=1, max_length=100, description="Name of the person restocking the item.", examples=["Ahmed"])
 
 
+class InventoryDeduction(BaseModel):
+    """Request body for POST /inventory/{id}/deduct — manual stock write-off."""
+
+    quantity: float = Field(..., gt=0, description="Amount of stock to remove (must be > 0).", examples=[2.0])
+    deducted_by: str = Field(..., min_length=1, max_length=100, description="Name of the person performing the deduction.", examples=["Manager Ahmed"])
+    reason: str = Field(
+        ...,
+        min_length=1,
+        max_length=200,
+        description="Reason for the deduction (e.g. Damaged, Expired, Staff Meal, Waste).",
+        examples=["Damaged", "Expired", "Staff Meal"],
+    )
+
+
 class InventoryItemUpdate(BaseModel):
     """Request body for updating an inventory item (PUT /inventory/{id}).
     All fields are optional — send only the ones you want to change."""
@@ -96,6 +110,7 @@ class MenuItemCreate(BaseModel):
         examples=["Mains"],
     )
     image_url: Optional[str] = Field(None, description="Optional Supabase Storage URL for the dish image.")
+    is_available: bool = Field(True, description="When false, item is hidden on customer menu and cannot be ordered.")
 
 
 class MenuItemUpdate(BaseModel):
@@ -107,6 +122,7 @@ class MenuItemUpdate(BaseModel):
     price: Optional[float] = Field(None, ge=0)
     category: Optional[str] = Field(None, min_length=1)
     image_url: Optional[str] = None
+    is_available: Optional[bool] = Field(None, description="Toggle item availability on the customer menu.")
 
 
 class MenuItemResponse(BaseModel):
@@ -118,6 +134,7 @@ class MenuItemResponse(BaseModel):
     price: float
     category: str
     image_url: Optional[str]
+    is_available: bool = True
     created_at: datetime
 
 

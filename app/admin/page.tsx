@@ -8,10 +8,12 @@ import {
   createMenuItem,
   updateMenuItem,
   deleteMenuItem,
+  toggleMenuItemAvailability,
   createInventoryItem,
   updateInventoryItem,
   deleteInventoryItem,
   restockInventoryItem,
+  deductInventoryItem,
   deleteOrder,
   type MenuItem,
   type InventoryItem,
@@ -182,6 +184,18 @@ export default function AdminPage() {
   const [restockAddedBy,  setRestockAddedBy]  = useState('')
   const [restockSaving,   setRestockSaving]   = useState(false)
   const [restockMsg,      setRestockMsg]      = useState('')
+
+  // ── Deduct modal state ─────────────────────────────────────────
+  const [deductItem,      setDeductItem]      = useState<InventoryItem | null>(null)
+  const [deductQty,       setDeductQty]       = useState('')
+  const [deductBy,        setDeductBy]        = useState('')
+  const [deductReason,    setDeductReason]    = useState('Damaged')
+  const [deductCustomReason, setDeductCustomReason] = useState('')
+  const [deductSaving,    setDeductSaving]    = useState(false)
+  const [deductMsg,       setDeductMsg]       = useState('')
+
+  // ── Availability toggle state ──────────────────────────────────
+  const [togglingId,      setTogglingId]      = useState<string | null>(null)
 
   // ── Orders (Live Kitchen Dashboard) state ─────────────────
   const [orders, setOrders]               = useState<OrderRecord[]>([])
@@ -388,6 +402,43 @@ export default function AdminPage() {
     } catch {
       setRestockMsg('Error restocking. Please check the API server.')
     } finally { setRestockSaving(false) }
+  }
+
+  // ============================================================
+  //  DEDUCT
+  // ============================================================
+  async function handleDeduct() {
+    if (!deductItem) return
+    const qty = parseFloat(deductQty)
+    if (isNaN(qty) || qty <= 0) { setDeductMsg('Quantity must be a number greater than 0.'); return }
+    if (!deductBy.trim())        { setDeductMsg('"Deducted By" name is required.'); return }
+    const finalReason = deductReason === 'Other' ? deductCustomReason.trim() : deductReason
+    if (!finalReason)            { setDeductMsg('Please specify a reason.'); return }
+
+    setDeductSaving(true); setDeductMsg('')
+    try {
+      await deductInventoryItem(deductItem.id, qty, deductBy.trim(), finalReason)
+      setInvMsg(`📉 ${deductItem.name} deducted (−${qty} ${deductItem.unit}) by ${deductBy.trim()}. Reason: ${finalReason}. Activity log updated.`)
+      setDeductItem(null); setDeductQty(''); setDeductBy(''); setDeductReason('Damaged'); setDeductCustomReason('')
+      fetchInventory()
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { detail?: string } } }
+      setDeductMsg(axiosErr?.response?.data?.detail ?? 'Error deducting stock. Please check the API server.')
+    } finally { setDeductSaving(false) }
+  }
+
+  // ============================================================
+  //  AVAILABILITY TOGGLE
+  // ============================================================
+  async function handleToggleAvailability(item: MenuItem) {
+    setTogglingId(item.id)
+    try {
+      await toggleMenuItemAvailability(item.id, !item.is_available)
+      setMenuMsg(`${!item.is_available ? '✅ Enabled' : '⛔ Disabled'}: ${item.name} is now ${!item.is_available ? 'Available' : 'Unavailable'}.`)
+      fetchMenuItems()
+    } catch {
+      setMenuMsg('Error toggling availability. Please check the API server.')
+    } finally { setTogglingId(null) }
   }
 
   // ============================================================
@@ -697,7 +748,12 @@ export default function AdminPage() {
                                 : <div className="card-image-placeholder">🍽️</div>
                               }
                               <div className="card-info">
-                                <h3 className="card-name premium-font-serif">{item.name}</h3>
+                                <h3 className="card-name premium-font-serif">
+                                  {item.name}
+                                  {!item.is_available && (
+                                    <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', padding: '2px 7px', borderRadius: 4, background: 'rgba(239,68,68,0.15)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.3)' }}>Unavailable</span>
+                                  )}
+                                </h3>
                                 <p className="card-desc">{item.description || 'No description.'}</p>
                                 <div className="card-price-row">
                                   <span className="price-tag">Br {item.price}</span>
@@ -705,6 +761,19 @@ export default function AdminPage() {
                               </div>
                               <div className="card-actions">
                                 <button className="action-btn-edit" onClick={() => startEditMenu(item)}>Edit</button>
+                                <button
+                                  disabled={togglingId === item.id}
+                                  onClick={() => handleToggleAvailability(item)}
+                                  style={{
+                                    fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
+                                    padding: '6px 10px', borderRadius: 4, cursor: togglingId === item.id ? 'not-allowed' : 'pointer',
+                                    transition: 'all 0.2s ease', whiteSpace: 'nowrap', border: 'none',
+                                    background: item.is_available ? 'rgba(239,68,68,0.12)' : 'rgba(74,222,128,0.12)',
+                                    color: item.is_available ? '#fca5a5' : '#4ade80',
+                                  }}
+                                >
+                                  {togglingId === item.id ? '…' : item.is_available ? '⛔ Disable' : '✅ Enable'}
+                                </button>
                                 <button className="action-btn-delete" onClick={() => handleDeleteMenuItem(item.id)}>Delete</button>
                               </div>
                             </div>
@@ -903,6 +972,10 @@ export default function AdminPage() {
                                   style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', padding: '6px 10px', border: '1px solid rgba(74,222,128,0.4)', background: 'transparent', color: '#4ade80', borderRadius: 4, cursor: 'pointer', transition: 'all 0.2s ease', whiteSpace: 'nowrap' }}
                                   onClick={() => { setRestockItem(item); setRestockQty(''); setRestockAddedBy(''); setRestockMsg('') }}
                                 >+Stock</button>
+                                <button
+                                  style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', padding: '6px 10px', border: '1px solid rgba(239,68,68,0.4)', background: 'transparent', color: '#fca5a5', borderRadius: 4, cursor: 'pointer', transition: 'all 0.2s ease', whiteSpace: 'nowrap' }}
+                                  onClick={() => { setDeductItem(item); setDeductQty(''); setDeductBy(''); setDeductReason('Damaged'); setDeductCustomReason(''); setDeductMsg('') }}
+                                >−Deduct</button>
                                 <button className="action-btn-delete" onClick={() => handleDeleteInventory(item.id)}>Del</button>
                               </div>
                             </td>
@@ -1434,6 +1507,114 @@ export default function AdminPage() {
                   disabled={restockSaving}
                 >
                   {restockSaving ? 'Saving…' : '▲ Confirm Restock'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================
+          MODAL: DEDUCT STOCK
+      ================================================================ */}
+      {deductItem && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="premium-form-modal w-full max-w-sm">
+            <div className="modal-header-row">
+              <h2 className="modal-header-title premium-font-serif">
+                ▼ Deduct Stock
+              </h2>
+              <button className="modal-close-btn" onClick={() => { setDeductItem(null); setDeductMsg('') }}>✕</button>
+            </div>
+            <div className="modal-body-form">
+
+              {/* Item name banner */}
+              <div style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 14px' }}>
+                <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(239,68,68,0.8)', marginBottom: 4 }}>Deducting From</p>
+                <p style={{ fontSize: 15, fontWeight: 700, color: 'white', fontFamily: 'Lora,Georgia,serif' }}>{deductItem.name}</p>
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+                  Current: <strong style={{ color: '#fca5a5' }}>{deductItem.stock_level} {deductItem.unit}</strong>
+                </p>
+              </div>
+
+              {/* Error message */}
+              {deductMsg && (
+                <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, padding: '10px 14px', fontSize: 12, color: '#fca5a5' }}>
+                  {deductMsg}
+                </div>
+              )}
+
+              {/* Quantity */}
+              <div className="form-group">
+                <label className="form-label">Quantity to Deduct ({deductItem.unit}) <span style={{ color: '#fca5a5', fontWeight: 800 }}>*</span></label>
+                <input
+                  type="number"
+                  min={0.001}
+                  step="any"
+                  className="form-input"
+                  value={deductQty}
+                  onChange={e => setDeductQty(e.target.value)}
+                  placeholder={`e.g. 2.0 ${deductItem.unit}`}
+                  autoFocus
+                />
+                {deductQty && !isNaN(parseFloat(deductQty)) && parseFloat(deductQty) > 0 && (
+                  <span style={{ fontSize: 10, color: '#fca5a5', marginTop: 2 }}>
+                    New total: {Math.max(0, deductItem.stock_level - parseFloat(deductQty)).toFixed(4)} {deductItem.unit}
+                  </span>
+                )}
+              </div>
+
+              {/* Deducted By */}
+              <div className="form-group">
+                <label className="form-label" style={{ color: '#C5A880' }}>
+                  Deducted By <span style={{ color: '#fca5a5', fontWeight: 800 }}>*</span>
+                </label>
+                <input
+                  className="form-input"
+                  value={deductBy}
+                  onChange={e => setDeductBy(e.target.value)}
+                  placeholder="Your name (recorded in Activity Log)"
+                />
+              </div>
+
+              {/* Reason */}
+              <div className="form-group">
+                <label className="form-label" style={{ color: '#C5A880' }}>
+                  Reason <span style={{ color: '#fca5a5', fontWeight: 800 }}>*</span>
+                </label>
+                <select
+                  className="form-select"
+                  value={deductReason}
+                  onChange={e => setDeductReason(e.target.value)}
+                >
+                  <option value="Damaged">Damaged</option>
+                  <option value="Expired">Expired</option>
+                  <option value="Staff Meal">Staff Meal</option>
+                  <option value="Waste">Waste</option>
+                  <option value="Spillage">Spillage</option>
+                  <option value="Quality Control">Quality Control</option>
+                  <option value="Other">Other (specify below)</option>
+                </select>
+                {deductReason === 'Other' && (
+                  <input
+                    className="form-input"
+                    style={{ marginTop: 6 }}
+                    value={deductCustomReason}
+                    onChange={e => setDeductCustomReason(e.target.value)}
+                    placeholder="Describe the reason…"
+                  />
+                )}
+              </div>
+
+              <div className="modal-footer-actions">
+                <button className="modal-btn-cancel" onClick={() => { setDeductItem(null); setDeductMsg('') }}>Cancel</button>
+                <button
+                  className="modal-btn-save"
+                  style={{ background: '#ef4444', color: 'white' }}
+                  onClick={handleDeduct}
+                  disabled={deductSaving}
+                >
+                  {deductSaving ? 'Saving…' : '▼ Confirm Deduction'}
                 </button>
               </div>
             </div>

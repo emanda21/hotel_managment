@@ -97,18 +97,23 @@ function TableModal({
           <>
             <div className="text-2xl mb-2">🏨</div>
             <h2 className="text-xl font-bold uppercase tracking-widest mb-1 text-[#111111] menu-item-title">Room Service</h2>
-            <p className="text-[#555555] text-xs mb-6 premium-font-sans menu-item-desc">Enter your room number for in-room delivery.</p>
+            <p className="text-[#555555] text-xs mb-4 premium-font-sans menu-item-desc">Your room number has been pre-filled automatically.</p>
 
-            {/* Room Number */}
-            <input
-              id="room-number-input"
-              type="text"
-              value={roomInput}
-              onChange={(e) => setRoomInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && confirmOrder()}
-              className="border-b-2 bg-transparent w-full text-center py-2 mb-6 text-2xl outline-none border-[#C5A880] text-[#111111] font-bold transition-colors focus:border-black premium-font-sans"
-              placeholder="e.g. 201" autoFocus
-            />
+            {/* Room Number — Read-Only: pre-populated from the /rooms selection */}
+            <div className="text-left mb-6 premium-font-sans">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[#555555] mb-2 flex items-center gap-1">
+                Room Number <span style={{ fontSize: 11 }}>🔒</span>
+              </p>
+              <input
+                id="room-number-input"
+                type="text"
+                value={roomInput}
+                readOnly
+                className="border-b-2 bg-transparent w-full text-center py-2 text-2xl outline-none border-[#C5A880] text-[#111111] font-bold premium-font-sans"
+                style={{ cursor: 'not-allowed', opacity: 0.85, letterSpacing: '0.12em' }}
+              />
+              <p className="text-[9px] text-[#999] mt-2 text-center">This is fixed to your room. To change it, go back and select a different room.</p>
+            </div>
           </>
         ) : (
           <>
@@ -241,6 +246,8 @@ function MenuPageInner() {
   const [placing, setPlacing] = useState(false)
   const [orderPlaced, setOrderPlaced] = useState(false)
   const [showTableModal, setShowTableModal] = useState(false)
+  // ── Unavailable item toast ──────────────────────────────────────────────────
+  const [unavailableToast, setUnavailableToast] = useState(false)
   // ── Order context: detected from localStorage on mount ─────────────────────
   const [isRoomService, setIsRoomService]             = useState(false)
   // Room Service fields
@@ -350,6 +357,12 @@ function MenuPageInner() {
   const currentQuote = FOOD_QUOTES[quoteIndex]
 
   function addToCart(item: MenuItem) {
+    // Guard: block unavailable items and show a polite toast
+    if (item.is_available === false) {
+      setUnavailableToast(true)
+      setTimeout(() => setUnavailableToast(false), 4500)
+      return
+    }
     setCart((prev) => {
       const existing = prev.find((c) => c.id === item.id)
       if (existing) return prev.map((c) => c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c)
@@ -662,7 +675,11 @@ function MenuPageInner() {
           {/* Square Slideshow Box (5-second duration) */}
           {/* Square Slideshow Box — only rendered once at least one menu item has loaded */}
           {currentSlideshowItem ? (
-            <div className="slideshow-square-box" onClick={() => addToCart(currentSlideshowItem)}>
+            <div
+              className="slideshow-square-box"
+              onClick={() => addToCart(currentSlideshowItem)}
+              style={currentSlideshowItem.is_available === false ? { opacity: 0.45, filter: 'grayscale(0.7)', cursor: 'not-allowed' } : {}}
+            >
               {currentSlideshowItem.image_url ? (
                 <img
                   key={currentSlideshowItem.id}
@@ -676,7 +693,7 @@ function MenuPageInner() {
                 </div>
               )}
               <div className="slideshow-overlay">
-                <span className="slideshow-badge">Chef's Special</span>
+                <span className="slideshow-badge">{currentSlideshowItem.is_available === false ? '⛔ Unavailable' : "Chef's Special"}</span>
                 <h3 className="slideshow-title">{currentSlideshowItem.name}</h3>
                 <p className="slideshow-price">Br {currentSlideshowItem.price}</p>
               </div>
@@ -726,8 +743,9 @@ function MenuPageInner() {
           <div className="scroll-menu-list">
             {filteredFoodItems.map((item) => {
               const inCart = cart.find((c) => c.id === item.id)
+              const unavailable = item.is_available === false
               return (
-                <div key={item.id} className="scroll-menu-item">
+                <div key={item.id} className="scroll-menu-item" style={unavailable ? { opacity: 0.45, filter: 'grayscale(0.65)' } : {}}>
                   {item.image_url ? (
                     <img src={item.image_url} alt={item.name} className="scroll-item-img" />
                   ) : (
@@ -742,7 +760,11 @@ function MenuPageInner() {
                     <div className="scroll-item-footer">
                       <p className="scroll-item-desc">{item.category}</p>
                       <div className="scroll-item-action">
-                        {inCart ? (
+                        {unavailable ? (
+                          <button onClick={() => addToCart(item)} className="scroll-add-btn" style={{ background: 'rgba(239,68,68,0.18)', color: '#fca5a5', borderColor: 'rgba(239,68,68,0.4)', cursor: 'not-allowed', fontSize: 9 }}>
+                            ⛔ Unavailable
+                          </button>
+                        ) : inCart ? (
                           <div className="scroll-cart-controls">
                             <button onClick={() => removeFromCart(item.id)}>-</button>
                             <span>{inCart.quantity}</span>
@@ -798,8 +820,9 @@ function MenuPageInner() {
           <div className="scroll-menu-list">
             {filteredDrinkItems.map((item) => {
               const inCart = cart.find((c) => c.id === item.id)
+              const unavailable = item.is_available === false
               return (
-                <div key={item.id} className="scroll-menu-item">
+                <div key={item.id} className="scroll-menu-item" style={unavailable ? { opacity: 0.45, filter: 'grayscale(0.65)' } : {}}>
                   {item.image_url ? (
                     <img src={item.image_url} alt={item.name} className="scroll-item-img" />
                   ) : (
@@ -814,7 +837,11 @@ function MenuPageInner() {
                     <div className="scroll-item-footer">
                       <p className="scroll-item-desc">{item.category}</p>
                       <div className="scroll-item-action">
-                        {inCart ? (
+                        {unavailable ? (
+                          <button onClick={() => addToCart(item)} className="scroll-add-btn" style={{ background: 'rgba(239,68,68,0.18)', color: '#fca5a5', borderColor: 'rgba(239,68,68,0.4)', cursor: 'not-allowed', fontSize: 9 }}>
+                            ⛔ Unavailable
+                          </button>
+                        ) : inCart ? (
                           <div className="scroll-cart-controls">
                             <button onClick={() => removeFromCart(item.id)}>-</button>
                             <span>{inCart.quantity}</span>
@@ -872,8 +899,9 @@ function MenuPageInner() {
           <div className="scroll-menu-list">
             {filteredKidsItems.map((item) => {
               const inCart = cart.find((c) => c.id === item.id)
+              const unavailable = item.is_available === false
               return (
-                <div key={item.id} className="scroll-menu-item">
+                <div key={item.id} className="scroll-menu-item" style={unavailable ? { opacity: 0.45, filter: 'grayscale(0.65)' } : {}}>
                   {item.image_url ? (
                     <img src={item.image_url} alt={item.name} className="scroll-item-img" />
                   ) : (
@@ -888,7 +916,11 @@ function MenuPageInner() {
                     <div className="scroll-item-footer">
                       <p className="scroll-item-desc">{item.category}</p>
                       <div className="scroll-item-action">
-                        {inCart ? (
+                        {unavailable ? (
+                          <button onClick={() => addToCart(item)} className="scroll-add-btn" style={{ background: 'rgba(239,68,68,0.18)', color: '#fca5a5', borderColor: 'rgba(239,68,68,0.4)', cursor: 'not-allowed', fontSize: 9 }}>
+                            ⛔ Unavailable
+                          </button>
+                        ) : inCart ? (
                           <div className="scroll-cart-controls">
                             <button onClick={() => removeFromCart(item.id)}>-</button>
                             <span>{inCart.quantity}</span>
@@ -935,6 +967,37 @@ function MenuPageInner() {
           <button className="bg-[#C5A880] text-white px-6 py-2.5 rounded font-bold text-xs uppercase tracking-widest hover:bg-[#b0936b] transition-colors duration-200 shadow-md" onClick={() => setShowTableModal(true)}>
             Place Order
           </button>
+        </div>
+      )}
+
+      {/* ── Unavailable Item Toast ─────────────────────────────────────────── */}
+      {unavailableToast && (
+        <div
+          style={{
+            position: 'fixed', bottom: 96, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 60, maxWidth: 420, width: 'calc(100% - 2.5rem)',
+            background: 'rgba(18,12,8,0.97)',
+            border: '1px solid rgba(197,168,128,0.35)',
+            borderRadius: 14, padding: '16px 20px',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.65)',
+            backdropFilter: 'blur(16px)',
+            display: 'flex', alignItems: 'flex-start', gap: 14,
+            animation: 'toastSlideUp 0.35s cubic-bezier(0.16,1,0.3,1) forwards',
+          }}
+        >
+          <span style={{ fontSize: 24, flexShrink: 0, lineHeight: 1 }}>🙏</span>
+          <div>
+            <p style={{ fontSize: 12, fontWeight: 700, color: '#C5A880', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
+              Item Unavailable
+            </p>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)', lineHeight: 1.55 }}>
+              We&apos;re sorry, but this item is currently unavailable. Please explore our menu for other delicious options!
+            </p>
+          </div>
+          <button
+            onClick={() => setUnavailableToast(false)}
+            style={{ marginLeft: 'auto', flexShrink: 0, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 14, cursor: 'pointer', lineHeight: 1, padding: 0 }}
+          >✕</button>
         </div>
       )}
 
@@ -1718,6 +1781,11 @@ const STYLESHEET = `
 @keyframes pulseSubtle {
   0%, 100% { transform: scale(1); box-shadow: 0 10px 25px rgba(197, 168, 128, 0.2); }
   50% { transform: scale(1.05); box-shadow: 0 10px 30px rgba(197, 168, 128, 0.4); }
+}
+
+@keyframes toastSlideUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(18px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
 /* Responsive Viewport Hacks to allow scrolling on mobile */
