@@ -84,12 +84,12 @@ function TableModal({
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
-      <div className="bg-[#FAF6EE] p-8 w-full max-w-sm text-center shadow-2xl rounded-2xl border border-[#C5A880]/20 premium-font-serif max-h-[90vh] overflow-y-auto">
+      <div className="bg-[#FAF6EE] p-8 w-full max-w-sm text-center shadow-2xl rounded-2xl border border-[#C8921A]/20 premium-font-serif max-h-[90vh] overflow-y-auto">
         {/* ── Ornament ── */}
         <div className="flex items-center gap-2 justify-center mb-4">
-          <div className="h-px w-8 bg-[#C5A880]/40"></div>
-          <span className="text-[#C5A880] text-xs">✦</span>
-          <div className="h-px w-8 bg-[#C5A880]/40"></div>
+          <div className="h-px w-8 bg-[#C8921A]/40"></div>
+          <span className="text-[#C8921A] text-xs">✦</span>
+          <div className="h-px w-8 bg-[#C8921A]/40"></div>
         </div>
 
         {/* ── Mode header ── */}
@@ -109,7 +109,7 @@ function TableModal({
                 type="text"
                 value={roomInput}
                 readOnly
-                className="border-b-2 bg-transparent w-full text-center py-2 text-2xl outline-none border-[#C5A880] text-[#111111] font-bold premium-font-sans"
+                className="border-b-2 bg-transparent w-full text-center py-2 text-2xl outline-none border-[#C8921A] text-[#111111] font-bold premium-font-sans"
                 style={{ cursor: 'not-allowed', opacity: 0.85, letterSpacing: '0.12em' }}
               />
               <p className="text-[9px] text-[#999] mt-2 text-center">This is fixed to your room. To change it, go back and select a different room.</p>
@@ -133,7 +133,7 @@ function TableModal({
                 value={tableInput}
                 onChange={(e) => setTableInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && confirmOrder()}
-                className="border-b-2 bg-transparent w-full text-center py-2 text-2xl outline-none border-[#C5A880] text-[#111111] font-bold transition-colors focus:border-black premium-font-sans"
+                className="border-b-2 bg-transparent w-full text-center py-2 text-2xl outline-none border-[#C8921A] text-[#111111] font-bold transition-colors focus:border-black premium-font-sans"
                 placeholder="e.g. 5" autoFocus
               />
             </div>
@@ -149,7 +149,7 @@ function TableModal({
                 value={waiterId}
                 onChange={(e) => setWaiterId(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && confirmOrder()}
-                className="border-b-2 bg-transparent w-full text-center py-2 text-lg outline-none border-[#C5A880] text-[#111111] font-bold transition-colors focus:border-black premium-font-sans"
+                className="border-b-2 bg-transparent w-full text-center py-2 text-lg outline-none border-[#C8921A] text-[#111111] font-bold transition-colors focus:border-black premium-font-sans"
                 placeholder="e.g. Ahmed or W-04"
               />
             </div>
@@ -167,7 +167,7 @@ function TableModal({
             onChange={(e) => setSpecialInstructions(e.target.value.slice(0, MAX_CHARS))}
             placeholder="e.g. No onions, extra spicy, well done…"
             rows={3}
-            className="w-full border border-[#C5A880]/40 bg-white/60 rounded-xl px-3 py-2.5 text-xs text-[#333] outline-none focus:border-[#C5A880] resize-none transition-colors duration-200 premium-font-sans"
+            className="w-full border border-[#C8921A]/40 bg-white/60 rounded-xl px-3 py-2.5 text-xs text-[#333] outline-none focus:border-[#C8921A] resize-none transition-colors duration-200 premium-font-sans"
           />
           <p className="text-right text-[9px] text-[#bbb] mt-1">{specialInstructions.length}/{MAX_CHARS}</p>
         </div>
@@ -183,11 +183,11 @@ function TableModal({
                   <p className="text-[10px] text-[#888888]">Br {c.price} each</p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <div className="flex items-center gap-1.5 border border-[#C5A880] rounded-lg px-2 py-1">
+                  <div className="flex items-center gap-1.5 border border-[#C8921A] rounded-lg px-2 py-1">
                     <button
                       type="button"
                       onClick={() => removeFromCart(c.id)}
-                      className="text-[#C5A880] font-bold text-xs w-4"
+                      className="text-[#C8921A] font-bold text-xs w-4"
                     >
                       −
                     </button>
@@ -195,7 +195,7 @@ function TableModal({
                     <button
                       type="button"
                       onClick={() => addToCart(c)}
-                      className="text-[#C5A880] font-bold text-xs w-4"
+                      className="text-[#C8921A] font-bold text-xs w-4"
                     >
                       +
                     </button>
@@ -208,7 +208,7 @@ function TableModal({
               <p className="text-[11px] text-[#999999] italic text-center py-2">Your cart is empty.</p>
             )}
           </div>
-          <div className="flex justify-between items-center mt-4 pt-3 border-t border-[#C5A880]/25">
+          <div className="flex justify-between items-center mt-4 pt-3 border-t border-[#C8921A]/25">
             <span className="text-[10px] font-bold uppercase tracking-widest text-[#555555]">Total</span>
             <span className="text-sm font-bold text-[#111111]">Br {total}</span>
           </div>
@@ -219,13 +219,13 @@ function TableModal({
         )}
         <div className="flex gap-3 premium-font-sans">
           <button
-            className="flex-1 py-3 border border-[#C5A880] text-xs font-semibold uppercase tracking-wider rounded-xl text-[#111111] bg-transparent hover:bg-[#C5A880]/10 transition-colors duration-200"
+            className="flex-1 py-3 border border-[#C8921A] text-xs font-semibold uppercase tracking-wider rounded-xl text-[#111111] bg-transparent hover:bg-[#C8921A]/10 transition-colors duration-200"
             onClick={() => setShowTableModal(false)}
           >
             Cancel
           </button>
           <button
-            className="flex-1 py-3 text-white text-xs font-semibold uppercase tracking-wider rounded-xl bg-[#C5A880] hover:bg-[#b0936b] transition-colors duration-200 disabled:opacity-40"
+            className="flex-1 py-3 text-white text-xs font-semibold uppercase tracking-wider rounded-xl bg-[#C8921A] hover:bg-[#A87215] transition-colors duration-200 disabled:opacity-40"
             onClick={confirmOrder}
             disabled={!canConfirm || placing || cart.length === 0}
           >
@@ -578,7 +578,7 @@ function MenuPageInner() {
           <p className="text-[#555555] mb-6 text-sm premium-font-sans leading-relaxed menu-item-desc">
             Thank you. The kitchen is preparing your dishes. We will serve you shortly.
           </p>
-          <button className="text-sm font-semibold text-[#111111] hover:text-[#C5A880] transition-colors duration-200 underline underline-offset-4 decoration-[#C5A880]/40 premium-font-sans" onClick={() => setOrderPlaced(false)}>
+          <button className="text-sm font-semibold text-[#111111] hover:text-[#C8921A] transition-colors duration-200 underline underline-offset-4 decoration-[#C8921A]/40 premium-font-sans" onClick={() => setOrderPlaced(false)}>
             Place another order
           </button>
         </div>
@@ -640,7 +640,7 @@ function MenuPageInner() {
         </div>
         {isSearching && (
           <p className="search-results-label">
-            Results for &ldquo;<span style={{ color: '#C5A880' }}>{searchQuery}</span>&rdquo;
+            Results for &ldquo;<span style={{ color: '#C8921A' }}>{searchQuery}</span>&rdquo;
             &nbsp;—&nbsp;
             {filteredFoodItems.length + filteredDrinkItems.length + filteredKidsItems.length} item
             {filteredFoodItems.length + filteredDrinkItems.length + filteredKidsItems.length !== 1 ? 's' : ''} found
@@ -664,7 +664,7 @@ function MenuPageInner() {
           <div style={{ position: 'absolute', top: 80, left: '50%', transform: 'translateX(-50%)', zIndex: 50, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: 10, padding: '14px 24px', maxWidth: 420, width: 'calc(100% - 3rem)', textAlign: 'center' }}>
             <p style={{ color: '#fca5a5', fontWeight: 700, fontSize: 12, marginBottom: 8 }}>⚠ Could not load menu</p>
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>{menuError}</p>
-            <button onClick={() => window.location.reload()} style={{ marginTop: 12, background: 'rgba(197,168,128,0.15)', border: '1px solid rgba(197,168,128,0.4)', color: '#C5A880', borderRadius: 6, padding: '6px 16px', fontSize: 10, fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            <button onClick={() => window.location.reload()} style={{ marginTop: 12, background: 'rgba(200,146,26,0.15)', border: '1px solid rgba(200,146,26,0.4)', color: '#C8921A', borderRadius: 6, padding: '6px 16px', fontSize: 10, fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
               ↺ Retry
             </button>
           </div>
@@ -964,7 +964,7 @@ function MenuPageInner() {
               {totalCount} item{totalCount > 1 ? 's' : ''} · Br {total}
             </span>
           </div>
-          <button className="bg-[#C5A880] text-white px-6 py-2.5 rounded font-bold text-xs uppercase tracking-widest hover:bg-[#b0936b] transition-colors duration-200 shadow-md" onClick={() => setShowTableModal(true)}>
+          <button className="bg-[#C8921A] text-white px-6 py-2.5 rounded font-bold text-xs uppercase tracking-widest hover:bg-[#A87215] transition-colors duration-200 shadow-md" onClick={() => setShowTableModal(true)}>
             Place Order
           </button>
         </div>
@@ -977,7 +977,7 @@ function MenuPageInner() {
             position: 'fixed', bottom: 96, left: '50%', transform: 'translateX(-50%)',
             zIndex: 60, maxWidth: 420, width: 'calc(100% - 2.5rem)',
             background: 'rgba(18,12,8,0.97)',
-            border: '1px solid rgba(197,168,128,0.35)',
+            border: '1px solid rgba(200,146,26,0.35)',
             borderRadius: 14, padding: '16px 20px',
             boxShadow: '0 24px 64px rgba(0,0,0,0.65)',
             backdropFilter: 'blur(16px)',
@@ -1024,7 +1024,7 @@ function MenuPageInner() {
       )}
 
       {/* Concierge/Chat Panel Toggle */}
-      <button className="fixed bottom-6 right-6 bg-[#C5A880] hover:bg-[#b0936b] text-white rounded-full w-14 h-14 flex items-center justify-center shadow-xl text-xl z-40 transition-all duration-300 hover:scale-105 active:scale-95 border border-white/10 animate-pulse-subtle" onClick={() => setChatOpen(!chatOpen)}>
+      <button className="fixed bottom-6 right-6 bg-[#C8921A] hover:bg-[#A87215] text-white rounded-full w-14 h-14 flex items-center justify-center shadow-xl text-xl z-40 transition-all duration-300 hover:scale-105 active:scale-95 border border-white/10 animate-pulse-subtle" onClick={() => setChatOpen(!chatOpen)}>
         {chatOpen ? '✕' : '🛎️'}
       </button>
 
@@ -1065,7 +1065,7 @@ function MenuPageInner() {
               onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()} 
               placeholder="e.g. Do you have chocolate desserts?" 
             />
-            <button className="bg-[#C5A880] hover:bg-[#b0936b] px-4 py-2 rounded text-xs font-bold text-white transition-colors duration-200" onClick={sendChatMessage}>
+            <button className="bg-[#C8921A] hover:bg-[#A87215] px-4 py-2 rounded text-xs font-bold text-white transition-colors duration-200" onClick={sendChatMessage}>
               Send
             </button>
           </div>
@@ -1101,8 +1101,8 @@ export default function MenuPage() {
         }}>
           <div style={{
             width: 40, height: 40,
-            border: '3px solid rgba(197,168,128,0.15)',
-            borderTopColor: '#C5A880',
+            border: '3px solid rgba(200,146,26,0.15)',
+            borderTopColor: '#C8921A',
             borderRadius: '50%',
             animation: 'spin 0.8s linear infinite',
           }} />
@@ -1191,11 +1191,11 @@ const STYLESHEET = `
 
 .premium-nav-left a:hover, .premium-nav-right a:hover, 
 .premium-nav-left a.active, .premium-nav-right a.active {
-  color: #C5A880 !important;
+  color: #C8921A !important;
 }
 
 .premium-table-btn {
-  background-color: #C5A880;
+  background-color: #C8921A;
   color: white !important;
   border: none;
   border-radius: 4px;
@@ -1210,7 +1210,7 @@ const STYLESHEET = `
 }
 
 .premium-table-btn:hover {
-  background-color: #b0936b;
+  background-color: #A87215;
 }
 
 /* Responsive adjustment for header layout */

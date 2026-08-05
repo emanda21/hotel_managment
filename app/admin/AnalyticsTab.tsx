@@ -20,15 +20,15 @@ import {
 } from 'recharts'
 import { getReportsData, type ReportsData, type RevenuePoint } from '../../services/api'
 
-// ─── Daris gold palette for charts ───────────────────────────────────────
-const GOLD   = '#C5A880'
-const GOLD2  = '#b0936b'
+// ─── Daris gold palette for charts ──────────────────────────────────────────
+const GOLD   = '#C8921A'
+const GOLD2  = '#A87215'
 const DARK   = 'rgba(255,255,255,0.04)'
 const AXIS   = 'rgba(255,255,255,0.25)'
 const GRID   = 'rgba(255,255,255,0.06)'
 const TOP_COLORS = [
-  '#C5A880','#b0936b','#9c7e56','#876943','#725530',
-  '#5d4220','#a08060','#c8aa88','#d4bb99','#deccaa',
+  '#C8921A','#A87215','#8A5F0F','#7A5410','#6A4A0C',
+  '#5A3F0A','#9A7018','#D4A030','#DEB050','#E8C070',
 ]
 
 type TrendView = 'daily' | 'monthly' | 'yearly'
@@ -38,7 +38,7 @@ function DarisTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
     <div style={{
-      background: 'rgba(10,8,6,0.95)', border: '1px solid rgba(197,168,128,0.3)',
+      background: 'rgba(10,8,6,0.95)', border: '1px solid rgba(200,146,26,0.3)',
       borderRadius: 8, padding: '10px 14px', fontSize: 12,
     }}>
       <p style={{ color: GOLD, fontWeight: 700, marginBottom: 4 }}>{label}</p>

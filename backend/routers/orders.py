@@ -32,9 +32,15 @@ PATCH /orders/{order_id}/kitchen-status
     The financial status column is NOT touched.
 
 POST /orders/clear-kitchen
-    Admin endpoint: marks all of today's 'served' orders as
+    Admin endpoint: marks ALL 'served' orders (no date restriction) as
     is_kitchen_cleared = TRUE so they disappear from the KDS board
     without deleting any financial or audit records.
+
+DELETE /orders/delete-all-served
+    Admin endpoint: permanently deletes ALL orders whose
+    kitchen_status = 'served' from the database. This is a hard delete
+    — records are gone permanently. Audit logs in inventory_logs are
+    preserved (foreign key references are nullified or kept by design).
 """
 
 from __future__ import annotations
@@ -60,6 +66,7 @@ from database import (
 )
 from schemas import (
     ClearKitchenResponse,
+    DeleteAllServedResponse,
     DeleteResponse,
     InsufficientStockResponse,
     KITCHEN_STATUSES,
@@ -659,71 +666,115 @@ def update_kitchen_status(
 
 
 # =============================================================================
+# =============================================================================
 # POST /orders/clear-kitchen
 # =============================================================================
 
 @router.post(
     "/orders/clear-kitchen",
     response_model=ClearKitchenResponse,
-    summary="Clear today's served orders from the KDS board",
+    summary="Clear ALL served orders from the KDS board (no date restriction)",
     description=(
-        "Admin endpoint. Marks every order whose ``kitchen_status = 'served'`` "
-        "and ``created_at`` falls on **today** (UTC) as "
-        "``is_kitchen_cleared = TRUE``.\n\n"
+        "Admin endpoint. Marks **every** order whose ``kitchen_status = 'served'`` "
+        "as ``is_kitchen_cleared = TRUE``, regardless of creation date.\n\n"
         "This removes them from the active KDS board view **without deleting "
         "any record** — all financial data and audit logs are preserved.\n\n"
+        "Operation is idempotent: re-running does not affect already-cleared orders.\n\n"
         "Returns the number of orders that were cleared."
     ),
     tags=["KDS"],
 )
 def clear_kitchen(db: DB) -> ClearKitchenResponse:
     """
-    Bulk-clears all 'served' orders from today off the KDS board.
+    Bulk-clears ALL 'served' orders from the KDS board — no date restriction.
 
     Strategy
     --------
-    * Filters by ``created_at`` date = today (UTC) to avoid accidentally
-      clearing orders from a previous shift that were somehow left uncleared.
     * Filters ``kitchen_status = 'served'`` — only completed orders are hidden.
-    * Filters ``is_kitchen_cleared = FALSE`` — idempotent: re-running has no
-      additional effect on already-cleared orders.
+    * Filters ``is_kitchen_cleared = FALSE`` — idempotent: already-cleared orders
+      are unaffected.
     * Updates only ``is_kitchen_cleared``; all other columns are untouched.
+    * No date filter — clears served orders from any day.
 
     Returns
     -------
-    The count of rows actually updated and the ISO date that was cleared.
+    The count of rows actually updated.
     """
-    today_str: str = date.today().isoformat()  # "YYYY-MM-DD"
-
-    # Build the ISO-8601 range for today in UTC
-    day_start = f"{today_str}T00:00:00+00:00"
-    day_end   = f"{today_str}T23:59:59.999999+00:00"
-
     response = (
         db.table("orders")
         .update({"is_kitchen_cleared": True})
         .eq("kitchen_status", "served")
         .eq("is_kitchen_cleared", False)
-        .gte("created_at", day_start)
-        .lte("created_at", day_end)
         .execute()
     )
 
     cleared_rows: list[dict] = response.data or []
     cleared_count = len(cleared_rows)
 
+    cleared_date = date.today().isoformat()
     logger.info(
-        "KDS | clear-kitchen: %d order(s) cleared for date %s",
+        "KDS | clear-kitchen (all dates): %d order(s) soft-cleared",
         cleared_count,
-        today_str,
     )
 
     return ClearKitchenResponse(
         message=(
             f"{cleared_count} served order(s) cleared from the KDS board."
             if cleared_count
-            else "No served orders found to clear for today."
+            else "No uncleared served orders found."
         ),
         cleared_count=cleared_count,
-        cleared_date=today_str,
+        cleared_date=cleared_date,
+    )
+
+
+# =============================================================================
+# DELETE /orders/delete-all-served
+# =============================================================================
+
+@router.delete(
+    "/orders/delete-all-served",
+    response_model=DeleteAllServedResponse,
+    summary="Permanently delete ALL served orders (admin only)",
+    description=(
+        "Hard-deletes **every** order row whose ``kitchen_status = 'served'`` "
+        "from the database, regardless of creation date.\n\n"
+        "**This is a destructive, permanent action — records cannot be "
+        "recovered.** Related ``inventory_logs`` rows are preserved so "
+        "the audit trail remains intact.\n\n"
+        "Intended for end-of-day or end-of-week cleanup by an admin after "
+        "the kitchen board has been reviewed."
+    ),
+    tags=["KDS"],
+)
+def delete_all_served_orders(db: DB) -> DeleteAllServedResponse:
+    """
+    Permanently removes all orders with kitchen_status = 'served'.
+
+    - No date filter — deletes served orders from any day.
+    - Returns the count of deleted rows.
+    - Inventory audit logs are NOT deleted (audit trail preserved).
+    """
+    response = (
+        db.table("orders")
+        .delete()
+        .eq("kitchen_status", "served")
+        .execute()
+    )
+
+    deleted_rows: list[dict] = response.data or []
+    deleted_count = len(deleted_rows)
+
+    logger.warning(
+        "Admin | delete-all-served: %d order(s) permanently deleted",
+        deleted_count,
+    )
+
+    return DeleteAllServedResponse(
+        message=(
+            f"{deleted_count} served order(s) permanently deleted from the database."
+            if deleted_count
+            else "No served orders found to delete."
+        ),
+        deleted_count=deleted_count,
     )

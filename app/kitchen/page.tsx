@@ -24,7 +24,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  clearKitchen,
   getKitchenOrders,
   updateKitchenStatus,
   type OrderRecord,
@@ -511,10 +510,8 @@ export default function KitchenPage() {
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState('')
   const [busyIds,      setBusyIds]      = useState<Set<string>>(new Set())
-  const [clearing,     setClearing]     = useState(false)
   const [lastUpdated,  setLastUpdated]  = useState<Date | null>(null)
   const [alarmEnabled, setAlarmEnabled] = useState(true)
-  const [clearMsg,     setClearMsg]     = useState('')
   const [errorMsg,     setErrorMsg]     = useState('')
   const [prepModal,    setPrepModal]    = useState<{ orderId: string; orderName: string } | null>(null)
 
@@ -663,25 +660,6 @@ export default function KitchenPage() {
     }
   }
 
-  async function handleClearBoard() {
-    if (!confirm(
-      "Clear today's served orders from the KDS board?\n\n" +
-      "This is a soft-hide — no records are deleted.\n" +
-      "All inventory deductions and financial data are preserved."
-    )) return
-    setClearing(true)
-    try {
-      const res = await clearKitchen()
-      setClearMsg(res.message)
-      await fetchOrders()
-      setTimeout(() => setClearMsg(''), 6_000)
-    } catch {
-      setErrorMsg('Failed to clear the board. Is the backend running?')
-      setTimeout(() => setErrorMsg(''), 5_000)
-    } finally {
-      setClearing(false)
-    }
-  }
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -771,23 +749,6 @@ export default function KitchenPage() {
               {alarmEnabled ? '🔔 Alarm ON' : '🔕 Alarm OFF'}
             </button>
 
-            {/* Clear board */}
-            <button id="kds-clear-board" onClick={handleClearBoard}
-              disabled={clearing || servedOrders.length === 0}
-              style={{
-                background: servedOrders.length === 0 ? '#111' : 'rgba(34,197,94,0.07)',
-                border: `2px solid ${servedOrders.length === 0 ? '#222' : '#22c55e'}`,
-                color: servedOrders.length === 0 ? '#333' : '#86efac',
-                borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 700,
-                cursor: servedOrders.length === 0 || clearing ? 'not-allowed' : 'pointer',
-                letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap',
-                display: 'flex', alignItems: 'center', gap: 6,
-              }}>
-              {clearing
-                ? <><span className="kds-spinner" /> Clearing…</>
-                : `🧹 Clear (${servedOrders.length})`}
-            </button>
-
             {/* Back home */}
             <a href="/" style={{
               background: '#111', border: '1px solid #2a2a2a', color: '#555',
@@ -821,17 +782,7 @@ export default function KitchenPage() {
                 fontSize: 20, cursor: 'pointer' }}>×</button>
           </div>
         )}
-        {clearMsg && (
-          <div style={{ background: '#051a0a', borderBottom: '2px solid #22c55e',
-            padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#86efac', flex: 1 }}>
-              ✓  {clearMsg}
-            </span>
-            <button onClick={() => setClearMsg('')}
-              style={{ background: 'none', border: 'none', color: '#86efac',
-                fontSize: 20, cursor: 'pointer' }}>×</button>
-          </div>
-        )}
+
 
         {/* ══ LOADING ══════════════════════════════════════════════════════ */}
         {loading && (

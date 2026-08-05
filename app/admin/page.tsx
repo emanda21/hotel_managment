@@ -5,6 +5,7 @@ import {
   getMenuItems,
   getOrders,
   clearKitchen,
+  deleteAllServedOrders,
   createMenuItem,
   updateMenuItem,
   deleteMenuItem,
@@ -69,6 +70,198 @@ function CardSkeleton() {
         <div style={{ height: 14, width: '60%', borderRadius: 4, background: 'rgba(255,255,255,0.07)' }} />
         <div style={{ height: 10, width: '85%', borderRadius: 4, background: 'rgba(255,255,255,0.05)' }} />
         <div style={{ height: 10, width: '30%', borderRadius: 4, background: 'rgba(197,168,128,0.15)' }} />
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
+//  SECURE ACTION MODAL — generic credential gate
+//  Used for both "Clear All Served" and "Delete All Served"
+// ============================================================
+interface SecureActionModalProps {
+  icon:         string
+  title:        string
+  description:  string
+  confirmLabel: string
+  /** CSS color for the accent (border, confirm button, focus ring). */
+  accentColor:  string
+  accentBg:     string
+  onConfirm: () => void
+  onCancel:  () => void
+}
+
+function SecureActionModal({
+  icon, title, description, confirmLabel,
+  accentColor, accentBg, onConfirm, onCancel,
+}: SecureActionModalProps) {
+  const [adminName, setAdminName]   = useState('')
+  const [adminPass, setAdminPass]   = useState('')
+  const [showPass,  setShowPass]    = useState(false)
+  const [error,     setError]       = useState('')
+
+  const isValid = adminName.trim() === ADMIN_USERNAME && adminPass === ADMIN_PASSWORD
+
+  function handleConfirm() {
+    if (!isValid) { setError('Invalid Admin Credentials'); return }
+    onConfirm()
+  }
+
+  const accentRgba  = `${accentColor}33`   // 20% alpha for glow
+  const borderStyle = `2px solid ${accentColor}88`
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)',
+        backdropFilter: 'blur(6px)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16,
+      }}
+      onClick={onCancel}
+    >
+      <div
+        style={{
+          background: '#111',
+          border: borderStyle,
+          borderRadius: 20, padding: '32px 30px', width: '100%', maxWidth: 440,
+          boxShadow: `0 0 60px ${accentRgba}, 0 24px 80px rgba(0,0,0,0.75)`,
+          display: 'flex', flexDirection: 'column', gap: 20,
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+          <span style={{ fontSize: 34, lineHeight: 1, flexShrink: 0 }}>{icon}</span>
+          <div>
+            <p style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase',
+              letterSpacing: '0.16em', color: accentColor, marginBottom: 6 }}>
+              Security Confirmation Required
+            </p>
+            <p style={{ fontSize: 16, fontWeight: 900, color: '#fff', lineHeight: 1.35 }}>
+              {title}
+            </p>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 7, lineHeight: 1.6 }}>
+              {description}
+            </p>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div style={{ height: 1, background: `${accentColor}33` }} />
+
+        {/* Credential fields */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+              letterSpacing: '0.1em', color: 'rgba(255,255,255,0.45)', display: 'block', marginBottom: 7 }}>
+              Admin Name
+            </label>
+            <input
+              id="secure-modal-username"
+              type="text"
+              autoComplete="off"
+              value={adminName}
+              onChange={e => { setAdminName(e.target.value); setError('') }}
+              onKeyDown={e => e.key === 'Enter' && handleConfirm()}
+              placeholder="Enter admin username"
+              style={{
+                width: '100%', background: 'rgba(255,255,255,0.05)',
+                border: '1.5px solid rgba(255,255,255,0.12)', borderRadius: 9,
+                padding: '11px 14px', color: '#fff', fontSize: 14,
+                outline: 'none', transition: 'border-color 0.2s', fontFamily: 'inherit',
+              }}
+              onFocus={e  => { e.currentTarget.style.borderColor = `${accentColor}99` }}
+              onBlur={e   => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)' }}
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+              letterSpacing: '0.1em', color: 'rgba(255,255,255,0.45)', display: 'block', marginBottom: 7 }}>
+              Admin Password
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                id="secure-modal-password"
+                type={showPass ? 'text' : 'password'}
+                autoComplete="new-password"
+                value={adminPass}
+                onChange={e => { setAdminPass(e.target.value); setError('') }}
+                onKeyDown={e => e.key === 'Enter' && handleConfirm()}
+                placeholder="Enter admin password"
+                style={{
+                  width: '100%', background: 'rgba(255,255,255,0.05)',
+                  border: '1.5px solid rgba(255,255,255,0.12)', borderRadius: 9,
+                  padding: '11px 44px 11px 14px', color: '#fff', fontSize: 14,
+                  outline: 'none', transition: 'border-color 0.2s', fontFamily: 'inherit',
+                }}
+                onFocus={e  => { e.currentTarget.style.borderColor = `${accentColor}99` }}
+                onBlur={e   => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPass(v => !v)}
+                style={{
+                  position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, lineHeight: 1,
+                }}
+              >
+                {showPass ? '🙈' : '👁️'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Error message */}
+        {error && (
+          <div style={{
+            background: `${accentBg}18`, border: `1px solid ${accentColor}55`,
+            borderRadius: 8, padding: '10px 14px',
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span style={{ fontSize: 14 }}>⚠️</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: accentColor }}>{error}</span>
+          </div>
+        )}
+
+        {/* Action buttons */}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            id="secure-modal-cancel"
+            type="button"
+            onClick={onCancel}
+            style={{
+              flex: 1, padding: '12px 0',
+              background: 'transparent', border: '1.5px solid rgba(255,255,255,0.15)',
+              borderRadius: 9, color: 'rgba(255,255,255,0.5)',
+              fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              textTransform: 'uppercase', letterSpacing: '0.08em',
+              transition: 'all 0.2s',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            id="secure-modal-confirm"
+            type="button"
+            onClick={handleConfirm}
+            disabled={!isValid}
+            style={{
+              flex: 2, padding: '12px 0',
+              background: isValid ? accentBg : 'rgba(255,255,255,0.04)',
+              border: `1.5px solid ${isValid ? accentColor : 'rgba(255,255,255,0.1)'}`,
+              borderRadius: 9,
+              color: isValid ? accentColor : 'rgba(255,255,255,0.2)',
+              fontSize: 13, fontWeight: 900,
+              cursor: isValid ? 'pointer' : 'not-allowed',
+              textTransform: 'uppercase', letterSpacing: '0.07em',
+              transition: 'all 0.25s',
+              boxShadow: isValid ? `0 0 22px ${accentRgba}` : 'none',
+            }}
+          >
+            {confirmLabel}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -203,8 +396,15 @@ export default function AdminPage() {
   const [ordersError, setOrdersError]       = useState('')
   const [lastRefreshed, setLastRefreshed]   = useState<Date | null>(null)
 
-  // ── Clear Kitchen Board (admin action) ────────────────────
-  const [clearingKitchen, setClearingKitchen] = useState(false)
+  // ── Global action modal — drives both "Clear All Served" and "Delete All Served" ──
+  // type: 'clear' = soft-hide (is_kitchen_cleared), 'deleteAll' = hard-delete from DB
+  const [globalActionModal, setGlobalActionModal] = useState<'clear' | 'deleteAll' | null>(null)
+
+  // ── In-progress flags for the two global order actions ────
+  const [clearingKitchen,     setClearingKitchen]     = useState(false)
+  const [deletingAllServed,   setDeletingAllServed]   = useState(false)
+
+  // ── Shared toast for both global order actions ─────────────
   const [clearKitchenMsg, setClearKitchenMsg] = useState<{
     type: 'success' | 'error'
     text: string
@@ -442,16 +642,35 @@ export default function AdminPage() {
   }
 
   // ============================================================
-  //  ORDERS — delete
+  //  ORDERS — global action handlers (called after modal confirms)
   // ============================================================
-  async function handleDeleteOrder(orderId: string, itemName: string) {
-    if (!confirm(`Permanently delete order for "${itemName}"?\n\nThis cannot be undone. Audit logs are preserved.`)) return
+  async function handleClearAllServed() {
+    setClearingKitchen(true)
+    setClearKitchenMsg(null)
     try {
-      await deleteOrder(orderId)
+      const result = await clearKitchen()
+      setClearKitchenMsg({ type: 'success', text: result.message, count: result.cleared_count })
       fetchOrders()
     } catch {
-      // Just re-fetch; the order may have already been cleared
+      setClearKitchenMsg({ type: 'error', text: 'Failed to clear the board. Is the FastAPI server running?' })
+    } finally {
+      setClearingKitchen(false)
+      setTimeout(() => setClearKitchenMsg(null), 7_000)
+    }
+  }
+
+  async function handleDeleteAllServed() {
+    setDeletingAllServed(true)
+    setClearKitchenMsg(null)
+    try {
+      const result = await deleteAllServedOrders()
+      setClearKitchenMsg({ type: 'success', text: result.message, count: result.deleted_count })
       fetchOrders()
+    } catch {
+      setClearKitchenMsg({ type: 'error', text: 'Failed to delete served orders. Is the FastAPI server running?' })
+    } finally {
+      setDeletingAllServed(false)
+      setTimeout(() => setClearKitchenMsg(null), 7_000)
     }
   }
 
@@ -995,107 +1214,103 @@ export default function AdminPage() {
         ================================================================ */}
         {activeTab === 'orders' && (
           <>
-            {/* ── Clear Kitchen Board — Admin Action Panel ──────────── */}
-            <div style={{
-              background: 'rgba(197,168,128,0.04)',
-              border: '1px solid rgba(197,168,128,0.18)',
-              borderRadius: 14,
-              padding: '18px 22px',
-              marginBottom: 24,
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 18,
-              flexWrap: 'wrap',
-            }}>
-              {/* Icon + copy */}
-              <div style={{ flex: 1, minWidth: 220 }}>
-                <p style={{
-                  fontSize: 13, fontWeight: 700, color: '#C5A880',
-                  textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6,
-                }}>
-                  🧹 Clear Daily Kitchen Board
-                </p>
-                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.6, margin: 0 }}>
-                  Hides all of today&apos;s <strong style={{ color: 'rgba(255,255,255,0.7)' }}>&ldquo;served&rdquo;</strong> orders
-                  from the Kitchen Display System.{' '}
-                  <span style={{ color: 'rgba(197,168,128,0.8)' }}>
-                    Records are never deleted — <code style={{ fontSize: 11, background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: 4 }}>is_kitchen_cleared</code> is
-                    set to <code style={{ fontSize: 11, background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: 4 }}>TRUE</code>,
-                    preserving all inventory audits and financial reports.
-                  </span>
-                </p>
+            {/* ── Admin Action Panels ──────────────────────────────── */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14, marginBottom: 24 }}>
+
+              {/* ── Panel 1: Clear All Served From Kitchen ── */}
+              <div style={{
+                background: 'rgba(197,168,128,0.04)',
+                border: '1px solid rgba(197,168,128,0.22)',
+                borderRadius: 14, padding: '18px 20px',
+                display: 'flex', flexDirection: 'column', gap: 12,
+              }}>
+                <div>
+                  <p style={{ fontSize: 11, fontWeight: 900, color: '#C5A880',
+                    textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 6 }}>
+                    🧹 Clear All Served From Kitchen
+                  </p>
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', lineHeight: 1.65, margin: 0 }}>
+                    Hides <strong style={{ color: 'rgba(255,255,255,0.7)' }}>all served</strong> orders from the
+                    Kitchen Display — regardless of date.{' '}
+                    <span style={{ color: 'rgba(197,168,128,0.75)' }}>
+                      Records are <em>never</em> deleted.
+                      Sets <code style={{ fontSize: 10, background: 'rgba(255,255,255,0.07)', padding: '1px 5px', borderRadius: 4 }}>is_kitchen_cleared = TRUE</code>.
+                      All audits &amp; financials are preserved.
+                    </span>
+                  </p>
+                </div>
+                <button
+                  id="clear-all-served-btn"
+                  disabled={clearingKitchen}
+                  onClick={() => setGlobalActionModal('clear')}
+                  style={{
+                    alignSelf: 'flex-start',
+                    padding: '9px 18px',
+                    background: clearingKitchen ? 'rgba(255,255,255,0.03)' : 'rgba(197,168,128,0.1)',
+                    border: `1px solid ${clearingKitchen ? 'rgba(197,168,128,0.15)' : 'rgba(197,168,128,0.4)'}`,
+                    borderRadius: 8, color: clearingKitchen ? 'rgba(197,168,128,0.35)' : '#C5A880',
+                    fontSize: 11, fontWeight: 800, letterSpacing: '0.09em', textTransform: 'uppercase',
+                    cursor: clearingKitchen ? 'not-allowed' : 'pointer', transition: 'all 0.2s',
+                    display: 'flex', alignItems: 'center', gap: 7,
+                  }}
+                >
+                  {clearingKitchen
+                    ? <><span className="premium-spinner-sm" /> Clearing…</>
+                    : '🧹 Clear All Served From Kitchen'}
+                </button>
               </div>
 
-              {/* Action button */}
-              <button
-                id="clear-kitchen-board-btn"
-                disabled={clearingKitchen}
-                onClick={async () => {
-                  if (!confirm(
-                    'Clear today\'s served orders from the Kitchen Display?\n\n' +
-                    'This is a soft-hide — no records are deleted. ' +
-                    'All inventory deductions and financial data are preserved.'
-                  )) return
-
-                  setClearingKitchen(true)
-                  setClearKitchenMsg(null)
-                  try {
-                    const result = await clearKitchen()
-                    setClearKitchenMsg({
-                      type: 'success',
-                      text: result.message,
-                      count: result.cleared_count,
-                    })
-                    // Refresh the orders list so cleared items disappear
-                    fetchOrders()
-                  } catch {
-                    setClearKitchenMsg({
-                      type: 'error',
-                      text: 'Failed to clear the board. Is the FastAPI server running?',
-                    })
-                  } finally {
-                    setClearingKitchen(false)
-                    // Auto-dismiss the toast after 6 seconds
-                    setTimeout(() => setClearKitchenMsg(null), 6_000)
-                  }
-                }}
-                style={{
-                  flexShrink: 0,
-                  alignSelf: 'center',
-                  padding: '10px 20px',
-                  background: clearingKitchen ? 'rgba(255,255,255,0.04)' : 'rgba(197,168,128,0.1)',
-                  border: '1px solid rgba(197,168,128,0.35)',
-                  borderRadius: 8,
-                  color: clearingKitchen ? 'rgba(197,168,128,0.4)' : '#C5A880',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  cursor: clearingKitchen ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                }}
-              >
-                {clearingKitchen
-                  ? <><span className="premium-spinner-sm" /> Clearing…</>
-                  : '🧹 Clear Board'}
-              </button>
+              {/* ── Panel 2: Delete All Served Orders (destructive) ── */}
+              <div style={{
+                background: 'rgba(239,68,68,0.03)',
+                border: '1px solid rgba(239,68,68,0.22)',
+                borderRadius: 14, padding: '18px 20px',
+                display: 'flex', flexDirection: 'column', gap: 12,
+              }}>
+                <div>
+                  <p style={{ fontSize: 11, fontWeight: 900, color: '#ef4444',
+                    textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 6 }}>
+                    🗑 Delete All Served Orders
+                  </p>
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', lineHeight: 1.65, margin: 0 }}>
+                    <strong style={{ color: 'rgba(239,68,68,0.85)' }}>Permanently deletes</strong> all served orders
+                    from the database — regardless of date.{' '}
+                    <span style={{ color: 'rgba(255,255,255,0.38)' }}>
+                      This action <em>cannot</em> be undone.
+                      Inventory audit logs in <code style={{ fontSize: 10, background: 'rgba(255,255,255,0.07)', padding: '1px 5px', borderRadius: 4 }}>inventory_logs</code> are preserved.
+                    </span>
+                  </p>
+                </div>
+                <button
+                  id="delete-all-served-btn"
+                  disabled={deletingAllServed}
+                  onClick={() => setGlobalActionModal('deleteAll')}
+                  style={{
+                    alignSelf: 'flex-start',
+                    padding: '9px 18px',
+                    background: deletingAllServed ? 'rgba(255,255,255,0.03)' : 'rgba(239,68,68,0.1)',
+                    border: `1px solid ${deletingAllServed ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.45)'}`,
+                    borderRadius: 8, color: deletingAllServed ? 'rgba(239,68,68,0.35)' : '#ef4444',
+                    fontSize: 11, fontWeight: 800, letterSpacing: '0.09em', textTransform: 'uppercase',
+                    cursor: deletingAllServed ? 'not-allowed' : 'pointer', transition: 'all 0.2s',
+                    display: 'flex', alignItems: 'center', gap: 7,
+                  }}
+                >
+                  {deletingAllServed
+                    ? <><span className="premium-spinner-sm" /> Deleting…</>
+                    : '🗑 Delete All Served Orders'}
+                </button>
+              </div>
             </div>
 
-            {/* ── Toast notification ───────────────────────────────────── */}
+            {/* ── Shared result toast ──────────────────────────────── */}
             {clearKitchenMsg && (
               <div
                 className="premium-alert animate-fadeIn"
                 style={{
                   marginBottom: 20,
-                  borderColor: clearKitchenMsg.type === 'success'
-                    ? 'rgba(74,222,128,0.35)'
-                    : 'rgba(239,68,68,0.4)',
-                  background: clearKitchenMsg.type === 'success'
-                    ? 'rgba(74,222,128,0.06)'
-                    : 'rgba(239,68,68,0.06)',
+                  borderColor: clearKitchenMsg.type === 'success' ? 'rgba(74,222,128,0.35)' : 'rgba(239,68,68,0.4)',
+                  background:   clearKitchenMsg.type === 'success' ? 'rgba(74,222,128,0.06)' : 'rgba(239,68,68,0.06)',
                 }}
               >
                 <span style={{
@@ -1103,24 +1318,21 @@ export default function AdminPage() {
                   letterSpacing: '0.08em', marginRight: 10,
                   color: clearKitchenMsg.type === 'success' ? '#4ade80' : '#fca5a5',
                 }}>
-                  {clearKitchenMsg.type === 'success' ? '✓ Board Cleared' : '⚠ Error'}
+                  {clearKitchenMsg.type === 'success' ? '✓ Done' : '⚠ Error'}
                 </span>
                 <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)' }}>
                   {clearKitchenMsg.text}
                   {clearKitchenMsg.type === 'success' && clearKitchenMsg.count !== undefined && (
                     <span style={{ marginLeft: 8, fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
-                      ({clearKitchenMsg.count} order{clearKitchenMsg.count !== 1 ? 's' : ''} soft-hidden)
+                      ({clearKitchenMsg.count} order{clearKitchenMsg.count !== 1 ? 's' : ''})
                     </span>
                   )}
                 </span>
                 <button
                   style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer',
-                    color: clearKitchenMsg.type === 'success' ? '#4ade80' : '#fca5a5',
-                    fontWeight: 700, fontSize: 14 }}
+                    color: clearKitchenMsg.type === 'success' ? '#4ade80' : '#fca5a5', fontWeight: 700, fontSize: 14 }}
                   onClick={() => setClearKitchenMsg(null)}
-                >
-                  ✕
-                </button>
+                >✕</button>
               </div>
             )}
 
@@ -1207,30 +1419,28 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      {/* Admin Delete Button */}
-                      <button
-                        id={`delete-order-${order.id}`}
-                        onClick={() => handleDeleteOrder(order.id, itemName)}
-                        style={{
-                          marginTop: 14,
-                          width: '100%',
-                          padding: '7px 0',
-                          background: 'transparent',
-                          border: '1px solid rgba(239,68,68,0.3)',
-                          borderRadius: 6,
-                          color: 'rgba(239,68,68,0.7)',
-                          fontSize: 10,
-                          fontWeight: 700,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.08em',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                        }}
-                        onMouseEnter={e => { (e.target as HTMLButtonElement).style.background = 'rgba(239,68,68,0.1)'; (e.target as HTMLButtonElement).style.borderColor = '#ef4444'; (e.target as HTMLButtonElement).style.color = '#ef4444' }}
-                        onMouseLeave={e => { (e.target as HTMLButtonElement).style.background = 'transparent'; (e.target as HTMLButtonElement).style.borderColor = 'rgba(239,68,68,0.3)'; (e.target as HTMLButtonElement).style.color = 'rgba(239,68,68,0.7)' }}
-                      >
-                        🗑 Delete Order
-                      </button>
+                      {/* Status Badge */}
+                      {(() => {
+                        const st = order.kitchen_status
+                        const statusMap: Record<string, { label: string; color: string; bg: string; border: string }> = {
+                          new:       { label: '🔴 New',      color: '#fca5a5', bg: 'rgba(239,68,68,0.12)',  border: 'rgba(239,68,68,0.4)' },
+                          preparing: { label: '🟡 Preparing',color: '#fde68a', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.4)' },
+                          served:    { label: '🟢 Served',   color: '#86efac', bg: 'rgba(34,197,94,0.12)',  border: 'rgba(34,197,94,0.4)' },
+                        }
+                        const s = statusMap[st] ?? statusMap.new
+                        return (
+                          <span style={{
+                            display: 'inline-block',
+                            marginTop: 10,
+                            fontSize: 9, fontWeight: 700,
+                            textTransform: 'uppercase', letterSpacing: '0.1em',
+                            padding: '4px 10px', borderRadius: 6,
+                            background: s.bg, color: s.color,
+                            border: `1px solid ${s.border}`,
+                          }}>{s.label}</span>
+                        )
+                      })()}
+
                     </div>
                   )
                 })}
@@ -1266,6 +1476,42 @@ export default function AdminPage() {
         )}
 
       </div>
+
+      {/* ================================================================
+          MODAL: SECURE GLOBAL ACTION CONFIRMATION
+          Drives both "Clear All Served" and "Delete All Served" actions.
+      ================================================================ */}
+      {globalActionModal === 'clear' && (
+        <SecureActionModal
+          icon="🧹"
+          title="Clear ALL Served Orders From Kitchen?"
+          description="This will soft-hide every served order from the Kitchen Display System — regardless of date. No records will be deleted. All financial data and inventory audits are fully preserved. This action sets is_kitchen_cleared = TRUE on all served orders."
+          confirmLabel="✓ Confirm — Clear All Served"
+          accentColor="#C5A880"
+          accentBg="rgba(197,168,128,0.15)"
+          onCancel={() => setGlobalActionModal(null)}
+          onConfirm={() => {
+            setGlobalActionModal(null)
+            handleClearAllServed()
+          }}
+        />
+      )}
+
+      {globalActionModal === 'deleteAll' && (
+        <SecureActionModal
+          icon="🗑"
+          title="Permanently Delete ALL Served Orders?"
+          description="This will hard-delete every order with status 'served' from the database — regardless of date. This action CANNOT be undone. Inventory audit logs in inventory_logs are preserved, but the order records will be gone forever."
+          confirmLabel="🗑 Confirm — Delete All Served"
+          accentColor="#ef4444"
+          accentBg="rgba(127,29,29,0.6)"
+          onCancel={() => setGlobalActionModal(null)}
+          onConfirm={() => {
+            setGlobalActionModal(null)
+            handleDeleteAllServed()
+          }}
+        />
+      )}
 
       {/* ================================================================
           MODAL: ADD / EDIT MENU ITEM

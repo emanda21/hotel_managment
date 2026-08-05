@@ -43,7 +43,7 @@ const CSS = `
   .rooms-glow-1 {
     position: fixed; top: -180px; right: -180px;
     width: 600px; height: 600px;
-    background: radial-gradient(circle, rgba(197,168,128,0.08) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(200,146,26,0.08) 0%, transparent 70%);
     border-radius: 50%; pointer-events: none; z-index: 0;
   }
   .rooms-glow-2 {
@@ -67,16 +67,16 @@ const CSS = `
   }
   .rooms-nav-logo-icon {
     width: 40px; height: 40px; border-radius: 50%;
-    background: linear-gradient(135deg, #C5A880, #8B6B45);
+    background: linear-gradient(135deg, #C8921A, #7A5410);
     display: flex; align-items: center; justify-content: center;
     font-weight: 900; font-size: 16px; color: #fff;
-    box-shadow: 0 0 20px rgba(197,168,128,0.3);
+    box-shadow: 0 0 20px rgba(200,146,26,0.3);
   }
   .rooms-nav-brand { line-height: 1; }
   .rooms-nav-brand-name {
     font-family: 'Lora', serif;
     font-size: 14px; font-weight: 700;
-    letter-spacing: 0.22em; color: #C5A880;
+    letter-spacing: 0.22em; color: #C8921A;
     text-transform: uppercase;
   }
   .rooms-nav-brand-sub {
@@ -92,7 +92,7 @@ const CSS = `
     padding: 8px 16px; border-radius: 6px;
     transition: all 0.2s ease;
   }
-  .rooms-nav-back:hover { color: #C5A880; border-color: rgba(197,168,128,0.4); }
+  .rooms-nav-back:hover { color: #C8921A; border-color: rgba(200,146,26,0.4); }
 
   /* ── Hero header ── */
   .rooms-hero {
@@ -102,16 +102,16 @@ const CSS = `
   }
   .rooms-hero-eyebrow {
     font-size: 10px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.35em; color: #C5A880;
+    letter-spacing: 0.35em; color: #C8921A;
     margin-bottom: 18px; display: flex; align-items: center;
     justify-content: center; gap: 10px;
   }
   .rooms-hero-eyebrow::before, .rooms-hero-eyebrow::after {
     content: ''; flex: 0 0 32px; height: 1px;
-    background: linear-gradient(to right, transparent, rgba(197,168,128,0.5));
+    background: linear-gradient(to right, transparent, rgba(200,146,26,0.5));
   }
   .rooms-hero-eyebrow::after {
-    background: linear-gradient(to left, transparent, rgba(197,168,128,0.5));
+    background: linear-gradient(to left, transparent, rgba(200,146,26,0.5));
   }
   .rooms-hero-title {
     font-family: 'Lora', serif;
@@ -119,7 +119,7 @@ const CSS = `
     font-weight: 700; color: #fff; line-height: 1.15;
     margin-bottom: 16px; letter-spacing: -0.02em;
   }
-  .rooms-hero-title span { color: #C5A880; }
+  .rooms-hero-title span { color: #C8921A; }
   .rooms-hero-sub {
     font-size: 13px; color: rgba(255,255,255,0.45);
     max-width: 480px; margin: 0 auto; line-height: 1.7; font-weight: 400;
@@ -128,7 +128,7 @@ const CSS = `
   /* ── Separator ── */
   .rooms-divider {
     width: 60px; height: 2px; margin: 32px auto 48px;
-    background: linear-gradient(to right, transparent, #C5A880, transparent);
+    background: linear-gradient(to right, transparent, #C8921A, transparent);
     position: relative; z-index: 1;
   }
 
@@ -158,20 +158,20 @@ const CSS = `
   .room-card::before {
     content: '';
     position: absolute; inset: 0;
-    background: radial-gradient(ellipse at 50% 0%, rgba(197,168,128,0.12) 0%, transparent 65%);
+    background: radial-gradient(ellipse at 50% 0%, rgba(200,146,26,0.12) 0%, transparent 65%);
     opacity: 0; transition: opacity 0.25s ease; border-radius: 18px;
   }
   .room-card:hover {
-    border-color: rgba(197,168,128,0.55);
+    border-color: rgba(200,146,26,0.55);
     transform: translateY(-6px) scale(1.02);
-    box-shadow: 0 20px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(197,168,128,0.2);
+    box-shadow: 0 20px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(200,146,26,0.2);
   }
   .room-card:hover::before { opacity: 1; }
   .room-card:active { transform: translateY(-2px) scale(0.98); }
 
   .room-card-icon {
     font-size: 36px; display: block; margin-bottom: 14px;
-    filter: drop-shadow(0 4px 8px rgba(197,168,128,0.25));
+    filter: drop-shadow(0 4px 8px rgba(200,146,26,0.25));
     transition: transform 0.25s ease;
   }
   .room-card:hover .room-card-icon { transform: scale(1.15); }
@@ -189,7 +189,7 @@ const CSS = `
   .room-card-tag {
     margin-top: 10px;
     font-size: 9px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.15em; color: rgba(197,168,128,0.55);
+    letter-spacing: 0.15em; color: rgba(200,146,26,0.55);
   }
 
   /* Animated gold border on hover */
@@ -197,7 +197,7 @@ const CSS = `
     content: '';
     position: absolute;
     inset: -1px; border-radius: 18px;
-    background: linear-gradient(135deg, #C5A880, #8B6B45, transparent, #C5A880);
+    background: linear-gradient(135deg, #C8921A, #7A5410, transparent, #C8921A);
     opacity: 0; transition: opacity 0.3s ease;
     z-index: -1;
   }

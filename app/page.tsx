@@ -28,7 +28,7 @@ export default function LandingPage() {
 
       {/* Ambient color glows — sit above kitchen bg, below content */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#6D0B2F]/12 rounded-full blur-[120px] pointer-events-none z-[2]"></div>
-      <div className="absolute top-1/3 left-0 w-[500px] h-[500px] bg-[#C5A880]/6 rounded-full blur-[120px] pointer-events-none z-[2]"></div>
+      <div className="absolute top-1/3 left-0 w-[500px] h-[500px] bg-[#C8921A]/6 rounded-full blur-[120px] pointer-events-none z-[2]"></div>
 
       {/* ── NAVBAR ── */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'premium-navbar-scrolled' : 'premium-navbar'}`}>
@@ -40,7 +40,7 @@ export default function LandingPage() {
               D
             </div>
             <div>
-              <p className="font-bold text-sm tracking-widest uppercase leading-none text-[#C5A880] premium-font-serif">DARIS</p>
+              <p className="font-bold text-sm tracking-widest uppercase leading-none text-[#C8921A] premium-font-serif">DARIS</p>
               <p className="text-[9px] tracking-widest uppercase text-white/50 font-bold mt-1">International Hotel</p>
             </div>
           </div>
@@ -58,8 +58,8 @@ export default function LandingPage() {
               { label: 'Admin',        href: '/admin' },
             ].map((item) => (
               <a key={item.label} href={item.href}
-                className={`text-xs uppercase tracking-widest transition-colors duration-300 font-semibold hover:text-[#C5A880] ${
-                  item.label === 'Home' ? 'text-[#C5A880] active-nav-link' : 'text-white/80'
+                className={`text-xs uppercase tracking-widest transition-colors duration-300 font-semibold hover:text-[#C8921A] ${
+                  item.label === 'Home' ? 'text-[#C8921A] active-nav-link' : 'text-white/80'
                 }`}>
                 {item.label}
               </a>
@@ -91,7 +91,7 @@ export default function LandingPage() {
                  : item === 'Room Service' ? '/rooms'
                  : `#${item.toLowerCase()}`
                  }
-                 className="text-xs uppercase tracking-widest text-white/90 hover:text-[#C5A880] transition-colors"
+                 className="text-xs uppercase tracking-widest text-white/90 hover:text-[#C8921A] transition-colors"
                  onClick={() => setMenuOpen(false)}>
                 {item}
               </a>
@@ -119,24 +119,24 @@ export default function LandingPage() {
         <div className="relative z-10 max-w-7xl mx-auto px-6 py-20 w-full grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
 
           <div className="animate-fadeIn">
-            <p className="text-xs font-bold uppercase tracking-[0.3em] mb-4 text-[#C5A880]">
+            <p className="text-xs font-bold uppercase tracking-[0.3em] mb-4 text-[#C8921A]">
               ✦ &nbsp; Fine Dining Experience
             </p>
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold leading-tight mb-6 premium-font-serif text-white">
               Delicious &<br />
-              <span className="text-[#C5A880]">Mouth Watering</span><br />
+              <span className="text-[#C8921A]">Mouth Watering</span><br />
               Cuisine
             </h1>
             <p className="text-white/60 text-sm md:text-base leading-relaxed mb-10 max-w-md font-light">
-              Experience world-class culinary art at <span className="text-[#C5A880] font-semibold">Daris International Hotel</span>.
+              Experience world-class culinary art at <span className="text-[#C8921A] font-semibold">Daris International Hotel</span>.
               Our passionate chefs combine fresh ingredients with gourmet creativity to satisfy your finest cravings.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4">
-              <a href="/menu" className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-center rounded-md transition-all duration-300 hover:scale-105 active:scale-95 premium-btn-gold shadow-lg shadow-[#C5A880]/10">
+              <a href="/menu" className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-center rounded-md transition-all duration-300 hover:scale-105 active:scale-95 premium-btn-gold shadow-lg shadow-[#C8921A]/10">
                 ✦ &nbsp; View Our Menu
               </a>
-              <a href="#about" className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-center rounded-md border border-[#C5A880]/30 text-white/80 transition-all duration-300 hover:border-[#C5A880] hover:text-[#C5A880]">
+              <a href="#about" className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-center rounded-md border border-[#C8921A]/30 text-white/80 transition-all duration-300 hover:border-[#C8921A] hover:text-[#C8921A]">
                 Learn More
               </a>
             </div>
@@ -145,7 +145,7 @@ export default function LandingPage() {
             <div className="flex gap-10 mt-14 pt-8 border-t border-white/10 max-w-md">
               {[{ num: '50+', label: 'Delicacies' }, { num: '10+', label: 'Tables' }, { num: '100%', label: 'Fresh Daily' }].map((s) => (
                 <div key={s.label}>
-                  <p className="text-2xl md:text-3xl font-bold text-[#C5A880] premium-font-serif">{s.num}</p>
+                  <p className="text-2xl md:text-3xl font-bold text-[#C8921A] premium-font-serif">{s.num}</p>
                   <p className="text-[9px] uppercase tracking-widest text-white/40 mt-1 font-bold">{s.label}</p>
                 </div>
               ))}
@@ -156,12 +156,12 @@ export default function LandingPage() {
           <div className="flex items-center justify-center lg:justify-end animate-fadeIn relative z-10" style={{ animationDelay: '0.2s' }}>
             <div className="relative w-[340px] h-[340px] md:w-[440px] md:h-[440px] flex items-center justify-center">
 
-              <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#6D0B2F]/30 via-transparent to-[#C5A880]/20 blur-2xl animate-spin-slow"></div>
+              <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#6D0B2F]/30 via-transparent to-[#C8921A]/20 blur-2xl animate-spin-slow"></div>
 
-              <div className="absolute inset-4 rounded-full border border-[#C5A880]/30"></div>
-              <div className="absolute inset-8 rounded-full border border-dashed border-[#C5A880]/15 animate-spin-reverse"></div>
+              <div className="absolute inset-4 rounded-full border border-[#C8921A]/30"></div>
+              <div className="absolute inset-8 rounded-full border border-dashed border-[#C8921A]/15 animate-spin-reverse"></div>
 
-              <div className="absolute inset-12 rounded-full overflow-hidden border border-[#C5A880]/30 shadow-2xl">
+              <div className="absolute inset-12 rounded-full overflow-hidden border border-[#C8921A]/30 shadow-2xl">
                 <img
                   src="https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=800"
                   alt="Daris Fine Dining"
@@ -170,7 +170,7 @@ export default function LandingPage() {
               </div>
 
               <div className="absolute top-1/4 right-0 md:-right-4 px-5 py-3 rounded-md text-center shadow-2xl animate-bounce-slow floating-badge">
-                <p className="text-[9px] font-bold uppercase tracking-widest text-[#C5A880]">Chef's Special</p>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-[#C8921A]">Chef's Special</p>
                 <p className="text-sm font-bold text-white premium-font-serif mt-0.5">RIBEYE STEAK</p>
               </div>
             </div>
@@ -186,9 +186,9 @@ export default function LandingPage() {
         <div className="section-kitchen-veil" />
 
         <div className="max-w-6xl mx-auto text-center relative z-10">
-          <p className="text-xs tracking-[0.4em] uppercase mb-3 text-[#C5A880]">✦ &nbsp; Why Choose Us &nbsp; ✦</p>
+          <p className="text-xs tracking-[0.4em] uppercase mb-3 text-[#C8921A]">✦ &nbsp; Why Choose Us &nbsp; ✦</p>
           <h2 className="text-3xl md:text-4xl font-bold mb-2 premium-font-serif text-white">Exceptional Dining</h2>
-          <div className="w-16 h-0.5 mx-auto mb-16 bg-[#C5A880]"></div>
+          <div className="w-16 h-0.5 mx-auto mb-16 bg-[#C8921A]"></div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
@@ -211,9 +211,9 @@ export default function LandingPage() {
       {/* ── POPULAR DISHES ── */}
       <section className="py-28 px-6 relative z-10">
         <div className="max-w-6xl mx-auto text-center">
-          <p className="text-xs tracking-[0.4em] uppercase mb-3 text-[#C5A880]">✦ &nbsp; Our Specialties &nbsp; ✦</p>
+          <p className="text-xs tracking-[0.4em] uppercase mb-3 text-[#C8921A]">✦ &nbsp; Our Specialties &nbsp; ✦</p>
           <h2 className="text-3xl md:text-4xl font-bold mb-2 premium-font-serif text-white">Popular Delicacies</h2>
-          <div className="w-16 h-0.5 mx-auto mb-16 bg-[#C5A880]"></div>
+          <div className="w-16 h-0.5 mx-auto mb-16 bg-[#C8921A]"></div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
@@ -231,7 +231,7 @@ export default function LandingPage() {
                   <h3 className="text-base font-bold mb-2 text-white premium-font-serif">{dish.name}</h3>
                   <p className="text-white/50 text-xs mb-5 font-light leading-relaxed min-h-[36px]">{dish.desc}</p>
                   <div className="flex items-center justify-between pt-4 border-t border-white/5">
-                    <span className="text-base font-bold text-[#C5A880] premium-font-serif">{dish.price}</span>
+                    <span className="text-base font-bold text-[#C8921A] premium-font-serif">{dish.price}</span>
                     <a href="/menu" className="px-5 py-2 text-[10px] font-bold uppercase tracking-widest rounded premium-btn-gold">Order</a>
                   </div>
                 </div>
@@ -239,7 +239,7 @@ export default function LandingPage() {
             ))}
           </div>
 
-          <a href="/menu" className="inline-block mt-16 px-8 py-3.5 text-xs font-bold uppercase tracking-widest rounded-md border border-[#C5A880] text-[#C5A880] hover:bg-[#C5A880]/10 transition-all duration-300">
+          <a href="/menu" className="inline-block mt-16 px-8 py-3.5 text-xs font-bold uppercase tracking-widest rounded-md border border-[#C8921A] text-[#C8921A] hover:bg-[#C8921A]/10 transition-all duration-300">
             View Full Menu &nbsp; →
           </a>
         </div>
@@ -252,10 +252,10 @@ export default function LandingPage() {
         <div className="cta-kitchen-veil" />
 
         <div className="max-w-xl mx-auto relative z-10">
-          <p className="text-xs tracking-[0.4em] uppercase mb-4 text-[#C5A880]">✦ &nbsp; Ready to Order? &nbsp; ✦</p>
+          <p className="text-xs tracking-[0.4em] uppercase mb-4 text-[#C8921A]">✦ &nbsp; Ready to Order? &nbsp; ✦</p>
           <h2 className="text-3xl md:text-5xl font-bold text-white mb-4 premium-font-serif">Gourmet Dining Awaits</h2>
           <p className="text-white/60 text-xs md:text-sm mb-10 leading-relaxed font-light">Scan the QR code located on your dining table or click the link below to browse our full menu and send your request straight to the chef.</p>
-          <a href="/menu" className="inline-block px-10 py-4 text-xs font-bold uppercase tracking-widest rounded-md transition-all duration-300 hover:scale-105 active:scale-95 premium-btn-gold shadow-lg shadow-[#C5A880]/10">
+          <a href="/menu" className="inline-block px-10 py-4 text-xs font-bold uppercase tracking-widest rounded-md transition-all duration-300 hover:scale-105 active:scale-95 premium-btn-gold shadow-lg shadow-[#C8921A]/10">
             ✦ &nbsp; Start Ordering Now &nbsp; ✦
           </a>
         </div>
@@ -264,9 +264,9 @@ export default function LandingPage() {
       {/* ── FOOTER ── */}
       <footer className="py-12 text-center px-6 bg-black relative z-10 border-t border-white/15">
         <div className="flex items-center justify-center gap-3 mb-4">
-          <div className="h-px w-10 bg-[#C5A880]/30"></div>
-          <span className="text-[#C5A880]/50 text-xs">✦</span>
-          <div className="h-px w-10 bg-[#C5A880]/30"></div>
+          <div className="h-px w-10 bg-[#C8921A]/30"></div>
+          <span className="text-[#C8921A]/50 text-xs">✦</span>
+          <div className="h-px w-10 bg-[#C8921A]/30"></div>
         </div>
         <p className="text-[10px] tracking-widest uppercase text-white/40 font-semibold">
           © 2026 Daris International Hotel — All Rights Reserved
@@ -274,7 +274,7 @@ export default function LandingPage() {
         {/* Discreet admin link in footer */}
         <a
           href="/admin"
-          className="inline-block mt-4 text-[9px] tracking-widest uppercase text-white/15 hover:text-[#C5A880]/50 transition-colors duration-300"
+          className="inline-block mt-4 text-[9px] tracking-widest uppercase text-white/15 hover:text-[#C8921A]/50 transition-colors duration-300"
         >
           Staff Console
         </a>
@@ -308,7 +308,7 @@ const STYLESHEET = [
   "  inset: 0;",
   "  z-index: 1;",
   "  background: radial-gradient(ellipse at 60% 0%, rgba(109,11,47,0.08) 0%, transparent 60%),",
-  "              radial-gradient(ellipse at 0% 100%, rgba(197,168,128,0.05) 0%, transparent 60%);",
+  "              radial-gradient(ellipse at 0% 100%, rgba(200,146,26,0.05) 0%, transparent 60%);",
   "  pointer-events: none;",
   "}",
   "",
@@ -320,7 +320,7 @@ const STYLESHEET = [
   "  z-index: 1;",
   "  background-size: cover;",
   "  background-position: center right;",
-  "  opacity: 0.10;",
+  "  opacity: 0.32;",
   "  pointer-events: none;",
   "}",
   "",
@@ -328,8 +328,8 @@ const STYLESHEET = [
   "  position: absolute;",
   "  inset: 0;",
   "  z-index: 2;",
-  "  background: linear-gradient(to right, rgba(12,10,9,0.98) 35%, rgba(12,10,9,0.5) 65%, transparent 100%),",
-  "              linear-gradient(to top, rgba(12,10,9,0.9) 0%, transparent 40%);",
+  "  background: linear-gradient(to right, rgba(12,10,9,0.72) 30%, rgba(12,10,9,0.30) 60%, transparent 100%),",
+  "              linear-gradient(to top, rgba(12,10,9,0.70) 0%, transparent 40%);",
   "  pointer-events: none;",
   "}",
   "",
@@ -382,9 +382,9 @@ const STYLESHEET = [
   "  text-decoration: none;",
   "}",
   ".admin-nav-link:hover {",
-  "  border-color: rgba(197,168,128,0.35);",
-  "  color: #C5A880;",
-  "  background: rgba(197,168,128,0.06);",
+  "  border-color: rgba(200,146,26,0.35);",
+  "  color: #C8921A;",
+  "  background: rgba(200,146,26,0.06);",
   "}",
   ".admin-nav-icon { line-height: 1; }",
   "",
@@ -397,27 +397,27 @@ const STYLESHEET = [
   ".premium-navbar-scrolled {",
   "  background-color: rgba(10, 10, 10, 0.9);",
   "  backdrop-filter: blur(10px);",
-  "  border-bottom: 1px solid rgba(197, 168, 128, 0.15);",
+  "  border-bottom: 1px solid rgba(200, 146, 26, 0.15);",
   "  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);",
   "}",
-  ".logo-icon { background-color: #C5A880; color: #111111; }",
+  ".logo-icon { background-color: #C8921A; color: #111111; }",
   ".active-nav-link { position: relative; }",
-  ".active-nav-link::after { content:'';position:absolute;bottom:-6px;left:0;right:0;height:2px;background-color:#C5A880;border-radius:2px; }",
-  ".premium-btn-gold { background-color:#C5A880;color:#111111 !important;border:none;cursor:pointer;transition:all 0.3s ease; }",
-  ".premium-btn-gold:hover { background-color:#b0936b; }",
-  ".mobile-menu-dropdown { background-color:rgba(10,10,10,0.98);backdrop-filter:blur(10px);border-bottom:1px solid rgba(197,168,128,0.15); }",
+  ".active-nav-link::after { content:'';position:absolute;bottom:-6px;left:0;right:0;height:2px;background-color:#C8921A;border-radius:2px; }",
+  ".premium-btn-gold { background-color:#C8921A;color:#111111 !important;border:none;cursor:pointer;transition:all 0.3s ease; }",
+  ".premium-btn-gold:hover { background-color:#A87215; }",
+  ".mobile-menu-dropdown { background-color:rgba(10,10,10,0.98);backdrop-filter:blur(10px);border-bottom:1px solid rgba(200,146,26,0.15); }",
   "",
   "/* ── FLOATING BADGE ────────────────────────────────────── */",
-  ".floating-badge { background:rgba(10,10,10,0.85);backdrop-filter:blur(8px);border:1px solid rgba(197,168,128,0.3); }",
+  ".floating-badge { background:rgba(10,10,10,0.85);backdrop-filter:blur(8px);border:1px solid rgba(200,146,26,0.3); }",
   "",
   "/* ── FEATURE CARDS ─────────────────────────────────────── */",
   ".premium-feature-card { background:rgba(255,255,255,0.02);border-color:rgba(255,255,255,0.06); }",
-  ".premium-feature-card:hover { background:rgba(255,255,255,0.04);border-color:rgba(197,168,128,0.25);transform:translateY(-4px);box-shadow:0 15px 30px rgba(0,0,0,0.4); }",
-  ".feature-icon-wrapper { background:rgba(197,168,128,0.08);border:1px solid rgba(197,168,128,0.2);color:#C5A880; }",
+  ".premium-feature-card:hover { background:rgba(255,255,255,0.04);border-color:rgba(200,146,26,0.25);transform:translateY(-4px);box-shadow:0 15px 30px rgba(0,0,0,0.4); }",
+  ".feature-icon-wrapper { background:rgba(200,146,26,0.08);border:1px solid rgba(200,146,26,0.2);color:#C8921A; }",
   "",
   "/* ── DISH CARDS ─────────────────────────────────────────── */",
   ".premium-dish-card { background:rgba(255,255,255,0.02);border-color:rgba(255,255,255,0.06); }",
-  ".premium-dish-card:hover { background:rgba(255,255,255,0.04);border-color:rgba(197,168,128,0.3);transform:translateY(-4px);box-shadow:0 15px 30px rgba(0,0,0,0.4); }",
+  ".premium-dish-card:hover { background:rgba(255,255,255,0.04);border-color:rgba(200,146,26,0.3);transform:translateY(-4px);box-shadow:0 15px 30px rgba(0,0,0,0.4); }",
   ".dish-image { transition:transform 0.6s ease; }",
   ".premium-dish-card:hover .dish-image { transform:scale(1.08); }",
   "",

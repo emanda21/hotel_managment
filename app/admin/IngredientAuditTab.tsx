@@ -176,7 +176,10 @@ export default function IngredientAuditTab({
     return (
       log.ingredient_name.toLowerCase().includes(q) ||
       (log.menu_item_name ?? '').toLowerCase().includes(q) ||
-      log.reason.toLowerCase().includes(q)
+      log.reason.toLowerCase().includes(q) ||
+      (log.deduction_reason ?? '').toLowerCase().includes(q) ||
+      (log.deducted_by ?? '').toLowerCase().includes(q) ||
+      (log.added_by ?? '').toLowerCase().includes(q)
     )
   })
 
@@ -569,13 +572,27 @@ export default function IngredientAuditTab({
                               ? <span style={{ color: '#4ade80', fontWeight: 600 }}>Added by: {log.added_by}</span>
                               : <span style={{ color: 'rgba(255,255,255,0.25)' }}>—</span>
                           )
-                        /* MANUAL_DEDUCTION → show Deducted By + Reason */
+                        /* MANUAL_DEDUCTION → show Deducted By + human reason */
                         : log.reason === 'MANUAL_DEDUCTION'
                           ? (
-                            <span>
+                            <span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                               <span style={{ color: '#fb7185', fontWeight: 600 }}>
                                 {log.deducted_by ? `Deducted by: ${log.deducted_by}` : 'Manual Deduction'}
                               </span>
+                              {log.deduction_reason && (
+                                <span style={{
+                                  display: 'inline-block',
+                                  fontSize: 9, fontWeight: 700,
+                                  textTransform: 'uppercase', letterSpacing: '0.06em',
+                                  color: '#fb7185',
+                                  background: 'rgba(251,113,133,0.1)',
+                                  border: '1px solid rgba(251,113,133,0.25)',
+                                  borderRadius: 4, padding: '2px 7px',
+                                  alignSelf: 'flex-start',
+                                }}>
+                                  {log.deduction_reason}
+                                </span>
+                              )}
                             </span>
                           )
                         /* Order-linked deductions → show menu item name */

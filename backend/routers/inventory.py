@@ -400,11 +400,12 @@ def deduct_inventory_item(
 
     # 4. Write audit log (negative change_amount = deduction)
     log_payload: dict = {
-        "inventory_id":  item_id,
-        "change_amount": -body.quantity,      # negative so audit shows it as a deduction
-        "reason":        "MANUAL_DEDUCTION",
-        "deducted_by":   body.deducted_by,
-        "added_by":      None,                # not a restock; keep added_by NULL
+        "inventory_id":    item_id,
+        "change_amount":   -body.quantity,   # negative → shown as deduction in audit
+        "reason":          "MANUAL_DEDUCTION",  # machine tag — used for filtering/badges
+        "deducted_by":     body.deducted_by,
+        "deduction_reason": body.reason,     # human label (Damaged, Expired, Waste, etc.)
+        "added_by":        None,             # not a restock
     }
     db.table("inventory_logs").insert(log_payload).execute()
 

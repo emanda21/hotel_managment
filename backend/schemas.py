@@ -221,7 +221,14 @@ class ClearKitchenResponse(BaseModel):
 
     message: str
     cleared_count: int
-    cleared_date: str  # ISO date string (YYYY-MM-DD) of the day that was cleared
+    cleared_date: str  # ISO date string (YYYY-MM-DD) of the day the action ran
+
+
+class DeleteAllServedResponse(BaseModel):
+    """Response returned by DELETE /orders/delete-all-served."""
+
+    message: str
+    deleted_count: int
 
 
 # =============================================================================

@@ -343,10 +343,24 @@ export async function updateKitchenStatus(
 export type ClearKitchenResponse = { message: string; cleared_count: number; cleared_date: string }
 
 /**
- * POST /orders/clear-kitchen — Mark all of today's 'served' orders as cleared.
+ * POST /orders/clear-kitchen — Mark ALL 'served' orders as is_kitchen_cleared=TRUE.
+ * No date restriction — clears served orders from any day.
+ * Records are never deleted; all audit and financial data is preserved.
  */
 export async function clearKitchen(): Promise<ClearKitchenResponse> {
   const { data } = await api.post<ClearKitchenResponse>('/orders/clear-kitchen')
+  return data
+}
+
+export type DeleteAllServedResponse = { message: string; deleted_count: number }
+
+/**
+ * DELETE /orders/delete-all-served — Permanently delete ALL orders with
+ * kitchen_status = 'served'. No date restriction. Destructive — cannot be undone.
+ * Related inventory_logs audit rows are preserved.
+ */
+export async function deleteAllServedOrders(): Promise<DeleteAllServedResponse> {
+  const { data } = await api.delete<DeleteAllServedResponse>('/orders/delete-all-served')
   return data
 }
 
@@ -436,6 +450,7 @@ export type InventoryLog = {
   unit: string
   change_amount: number
   current_stock: number
+  /** Machine tag: MANUAL_RESTOCK | MANUAL_DEDUCTION | ORDER_DEDUCTION | INITIAL_STOCK | etc. */
   reason: string
   order_id: string | null
   menu_item_name: string | null
@@ -444,6 +459,9 @@ export type InventoryLog = {
   added_by: string | null
   /** Name of the person who performed a manual deduction (MANUAL_DEDUCTION rows only) */
   deducted_by: string | null
+  /** Human-readable reason chosen by the admin for MANUAL_DEDUCTION rows
+   *  e.g. "Damaged", "Expired", "Staff Meal", "Waste", "Spillage" */
+  deduction_reason: string | null
 }
 
 export interface AuditParams {
